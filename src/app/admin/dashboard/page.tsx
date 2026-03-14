@@ -283,7 +283,10 @@ export default function AdminDashboard() {
           <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
             <ShieldAlert className="text-white w-6 h-6" />
           </div>
-          <h1 className="text-xl font-headline font-bold text-foreground">TechQuiz Admin</h1>
+          <div className="flex flex-col">
+            <h1 className="text-xl font-headline font-bold text-foreground leading-tight">TechQuiz Admin</h1>
+            <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">{session?.user?.email}</span>
+          </div>
         </div>
         <div className="flex items-center gap-4">
           <Badge variant="outline" className="hidden md:flex gap-1 border-primary/20 text-primary bg-primary/5">
@@ -365,6 +368,7 @@ export default function AdminDashboard() {
                       <form onSubmit={handleSaveQuestion} className="space-y-4">
                         <DialogHeader>
                           <DialogTitle className="text-2xl font-black">{isEditing?.id ? "Update Question" : "Create Question"}</DialogTitle>
+                          <DialogDescription>Fill in the details for the quiz question below.</DialogDescription>
                         </DialogHeader>
                         <div className="space-y-4 py-4">
                           <div className="space-y-2">
