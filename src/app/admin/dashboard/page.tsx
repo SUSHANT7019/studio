@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
@@ -13,7 +12,20 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { LayoutDashboard, FileQuestion, Users, Trophy, Download, Plus, Trash2, Edit, LogOut, Search, Filter } from "lucide-react";
+import { 
+  LayoutDashboard, 
+  FileQuestion, 
+  Users, 
+  Trophy, 
+  Download, 
+  Plus, 
+  Trash2, 
+  Edit, 
+  LogOut, 
+  Search, 
+  Filter,
+  ShieldAlert 
+} from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 export default function AdminDashboard() {
