@@ -8,6 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Timer, ChevronLeft, ChevronRight, CheckCircle2, ListChecks, Info } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -220,9 +221,50 @@ export default function QuizPage() {
 
   if (status === "loading") {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-background">
-        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-        <p className="font-headline font-semibold text-primary">Setting up the quiz...</p>
+      <div className="min-h-screen bg-background flex flex-col font-body">
+        <header className="bg-white border-b px-6 py-4 flex items-center justify-between">
+          <div className="space-y-1">
+            <Skeleton className="h-6 w-32" />
+            <Skeleton className="h-3 w-48" />
+          </div>
+          <div className="flex items-center gap-6">
+            <Skeleton className="h-10 w-24 rounded-full" />
+            <Skeleton className="h-10 w-20 rounded-md" />
+          </div>
+        </header>
+        <main className="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full">
+          <div className="flex flex-col md:flex-row gap-8">
+            <div className="flex-1 space-y-6">
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-2 w-full" />
+              </div>
+              <Card className="shadow-lg border-0">
+                <CardHeader>
+                  <Skeleton className="h-8 w-3/4" />
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <Skeleton className="h-16 w-full rounded-xl" />
+                  <Skeleton className="h-16 w-full rounded-xl" />
+                  <Skeleton className="h-16 w-full rounded-xl" />
+                  <Skeleton className="h-16 w-full rounded-xl" />
+                </CardContent>
+              </Card>
+            </div>
+            <aside className="w-full md:w-80">
+              <Card className="border-0 shadow-lg">
+                <Skeleton className="h-10 w-full rounded-t-lg" />
+                <CardContent className="p-5">
+                  <div className="grid grid-cols-5 gap-2.5">
+                    {Array.from({ length: 15 }).map((_, i) => (
+                      <Skeleton key={i} className="aspect-square rounded-lg" />
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </aside>
+          </div>
+        </main>
       </div>
     );
   }
@@ -244,13 +286,13 @@ export default function QuizPage() {
     );
   }
 
-  const q = questions[currentIdx];
-  const progress = questions.length > 0 ? ((currentIdx + 1) / questions.length) * 100 : 0;
+  const qData = questions[currentIdx];
+  const progressVal = questions.length > 0 ? ((currentIdx + 1) / questions.length) * 100 : 0;
 
-  if (!q) return null;
+  if (!qData) return null;
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col font-body">
       <header className="bg-white border-b sticky top-0 z-20 px-6 py-4 shadow-sm flex items-center justify-between">
         <div className="flex flex-col">
           <h1 className="text-xl font-headline font-bold text-primary">TechQuiz Ascent</h1>
@@ -283,37 +325,37 @@ export default function QuizPage() {
             <div className="space-y-2">
               <div className="flex justify-between text-sm font-semibold text-muted-foreground">
                 <span>Question {currentIdx + 1} of {questions.length}</span>
-                <span>{Math.round(progress)}% Progress</span>
+                <span>{Math.round(progressVal)}% Progress</span>
               </div>
-              <Progress value={progress} className="h-2 bg-secondary" />
+              <Progress value={progressVal} className="h-2 bg-secondary" />
             </div>
 
             <Card className="shadow-lg border-0 bg-white">
               <CardHeader>
                 <CardTitle className="text-2xl font-headline leading-relaxed text-foreground">
-                  {q.question_text}
+                  {qData.question_text}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6 pt-4">
                 <RadioGroup 
-                  value={answers[q.id] || ""} 
+                  value={answers[qData.id] || ""} 
                   onValueChange={handleAnswerSelect}
                   className="grid gap-4"
                 >
                   {[
-                    { id: "A", label: q.option_a },
-                    { id: "B", label: q.option_b },
-                    { id: "C", label: q.option_c },
-                    { id: "D", label: q.option_d },
+                    { id: "A", label: qData.option_a },
+                    { id: "B", label: qData.option_b },
+                    { id: "C", label: qData.option_c },
+                    { id: "D", label: qData.option_d },
                   ].map((opt) => (
                     <Label
                       key={opt.id}
                       htmlFor={`option-${opt.id}`}
-                      className={`flex items-center p-4 rounded-xl border-2 cursor-pointer transition-all hover:border-primary/50 ${answers[q.id] === opt.id ? 'border-primary bg-primary/5 shadow-md' : 'border-secondary'}`}
+                      className={`flex items-center p-4 rounded-xl border-2 cursor-pointer transition-all hover:border-primary/50 ${answers[qData.id] === opt.id ? 'border-primary bg-primary/5 shadow-md' : 'border-secondary'}`}
                     >
                       <div className="flex items-center gap-4 w-full">
                         <RadioGroupItem value={opt.id} id={`option-${opt.id}`} className="sr-only" />
-                        <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${answers[q.id] === opt.id ? 'bg-primary text-white' : 'bg-secondary text-muted-foreground'}`}>
+                        <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${answers[qData.id] === opt.id ? 'bg-primary text-white' : 'bg-secondary text-muted-foreground'}`}>
                           {opt.id}
                         </span>
                         <span className="text-lg font-medium">{opt.label}</span>

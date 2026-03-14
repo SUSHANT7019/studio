@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
@@ -13,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Skeleton } from "@/components/ui/skeleton";
 import { 
   LayoutDashboard, 
   FileQuestion, 
@@ -90,13 +90,6 @@ export default function AdminDashboard() {
     } catch (error: any) {
       console.error("Fetch error:", error);
       setDbError(error.message);
-      if (error.code === '42501') {
-        toast({
-          title: "RLS Permission Error",
-          description: "Row Level Security is blocking your access.",
-          variant: "destructive"
-        });
-      }
     } finally {
       setLoading(false);
     }
@@ -203,17 +196,14 @@ export default function AdminDashboard() {
 
   const filteredResults = useMemo(() => {
     let filtered = results.filter(r => {
-      // Name/College filter
       const matchesName = 
         (r.participant_name?.toLowerCase() || "").includes(searchName.toLowerCase()) || 
         (r.college_name?.toLowerCase() || "").includes(searchName.toLowerCase());
       if (!matchesName) return false;
 
-      // Level filter
       const matchesLevel = filterLevel === "All" || r.level === filterLevel;
       if (!matchesLevel) return false;
 
-      // Score filter
       if (scoreFilterValue !== "") {
         const val = parseInt(scoreFilterValue, 10);
         if (!isNaN(val)) {
@@ -295,7 +285,7 @@ export default function AdminDashboard() {
   if (!session) return null;
 
   return (
-    <div className="min-h-screen bg-secondary/30 flex flex-col">
+    <div className="min-h-screen bg-secondary/30 flex flex-col font-body">
       <header className="bg-white border-b sticky top-0 z-20 px-8 py-4 flex justify-between items-center shadow-sm">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
@@ -346,19 +336,19 @@ export default function AdminDashboard() {
                <Card className="border-l-4 border-l-primary shadow-sm">
                  <CardHeader className="pb-2">
                    <CardDescription className="text-xs font-bold uppercase">Total Submissions</CardDescription>
-                   <CardTitle className="text-4xl font-black">{results.length}</CardTitle>
+                   {loading ? <Skeleton className="h-10 w-24 mt-2" /> : <CardTitle className="text-4xl font-black">{results.length}</CardTitle>}
                  </CardHeader>
                </Card>
                <Card className="border-l-4 border-l-green-500 shadow-sm">
                  <CardHeader className="pb-2">
                    <CardDescription className="text-xs font-bold uppercase">Promoted Participants</CardDescription>
-                   <CardTitle className="text-4xl font-black">{results.filter(r => r.qualified_for).length}</CardTitle>
+                   {loading ? <Skeleton className="h-10 w-24 mt-2" /> : <CardTitle className="text-4xl font-black">{results.filter(r => r.qualified_for).length}</CardTitle>}
                  </CardHeader>
                </Card>
                <Card className="border-l-4 border-l-accent shadow-sm">
                  <CardHeader className="pb-2">
                    <CardDescription className="text-xs font-bold uppercase">Active Questions</CardDescription>
-                   <CardTitle className="text-4xl font-black">{questions.length}</CardTitle>
+                   {loading ? <Skeleton className="h-10 w-24 mt-2" /> : <CardTitle className="text-4xl font-black">{questions.length}</CardTitle>}
                  </CardHeader>
                </Card>
             </div>
@@ -455,7 +445,15 @@ export default function AdminDashboard() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {questions.length === 0 ? (
+                    {loading ? (
+                      Array.from({ length: 5 }).map((_, i) => (
+                        <TableRow key={i}>
+                          <TableCell><Skeleton className="h-5 w-full" /></TableCell>
+                          <TableCell><Skeleton className="h-5 w-20" /></TableCell>
+                          <TableCell className="text-right pr-6"><Skeleton className="h-8 w-16 ml-auto" /></TableCell>
+                        </TableRow>
+                      ))
+                    ) : questions.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={3} className="h-32 text-center text-muted-foreground">No questions found.</TableCell>
                       </TableRow>
@@ -585,7 +583,18 @@ export default function AdminDashboard() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredResults.length === 0 ? (
+                    {loading ? (
+                      Array.from({ length: 5 }).map((_, i) => (
+                        <TableRow key={i}>
+                          <TableCell><Skeleton className="h-10 w-32" /></TableCell>
+                          <TableCell><Skeleton className="h-6 w-16" /></TableCell>
+                          <TableCell><Skeleton className="h-8 w-8 mx-auto rounded-full" /></TableCell>
+                          <TableCell><Skeleton className="h-5 w-20 mx-auto" /></TableCell>
+                          <TableCell><Skeleton className="h-8 w-32" /></TableCell>
+                          <TableCell className="text-right pr-6"><Skeleton className="h-8 w-16 ml-auto" /></TableCell>
+                        </TableRow>
+                      ))
+                    ) : filteredResults.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">No records found.</TableCell>
                       </TableRow>
