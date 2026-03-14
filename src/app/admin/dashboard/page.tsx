@@ -27,7 +27,8 @@ import {
   ArrowUpCircle,
   CheckCircle2,
   XCircle,
-  AlertTriangle
+  AlertTriangle,
+  UserCog
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
@@ -38,6 +39,7 @@ export default function AdminDashboard() {
   const [rounds, setRounds] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState<any>(null);
+  const [isEditingParticipant, setIsEditingParticipant] = useState<any>(null);
   const [session, setSession] = useState<any>(null);
   const [dbError, setDbError] = useState<string | null>(null);
 
@@ -81,7 +83,7 @@ export default function AdminDashboard() {
       if (error.code === '42501') {
         toast({
           title: "RLS Permission Error",
-          description: "Row Level Security is blocking your access. Ensure 'authenticated' users have proper SELECT policies.",
+          description: "Row Level Security is blocking your access. Ensure 'authenticated' users have proper policies.",
           variant: "destructive"
         });
       }
@@ -95,6 +97,7 @@ export default function AdminDashboard() {
     router.push("/admin");
   };
 
+  // Question Actions
   const handleDeleteQuestion = async (id: string) => {
     if (!confirm("Delete this question permanently?")) return;
     const { error } = await supabase.from("questions").delete().eq("id", id);
@@ -122,6 +125,42 @@ export default function AdminDashboard() {
     setIsEditing(null);
     fetchData();
     toast({ title: "Success", description: "Question bank updated." });
+  };
+
+  // Participant Actions
+  const handleDeleteParticipant = async (id: string) => {
+    if (!confirm("Delete this participant record? This cannot be undone.")) return;
+    const { error } = await supabase.from("participants").delete().eq("id", id);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      fetchData();
+      toast({ title: "Deleted", description: "Participant record removed." });
+    }
+  };
+
+  const handleSaveParticipant = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const data = Object.fromEntries(formData.entries());
+    
+    // Convert score to number
+    const payload = {
+      ...data,
+      score: parseInt(data.score as string, 10) || 0,
+      time_taken: parseInt(data.time_taken as string, 10) || 0
+    };
+
+    if (isEditingParticipant?.id) {
+      const { error } = await supabase.from("participants").update(payload).eq("id", isEditingParticipant.id);
+      if (error) {
+        toast({ title: "Error", description: error.message, variant: "destructive" });
+      } else {
+        toast({ title: "Updated", description: "Participant details saved." });
+        setIsEditingParticipant(null);
+        fetchData();
+      }
+    }
   };
 
   const handlePromote = async (participantId: string, nextLevel: string | null) => {
@@ -199,7 +238,7 @@ export default function AdminDashboard() {
             <AlertTriangle className="w-5 h-5" />
             <div>
               <p className="font-bold">Database Fetch Error</p>
-              <p className="text-sm opacity-90">{dbError}. Check if Row Level Security (RLS) is configured correctly in Supabase.</p>
+              <p className="text-sm opacity-90">{dbError}. Check if RLS is configured correctly.</p>
             </div>
             <Button variant="outline" size="sm" onClick={fetchData} className="ml-auto border-destructive hover:bg-destructive/20">Retry</Button>
           </div>
@@ -210,7 +249,7 @@ export default function AdminDashboard() {
             <TabsList className="bg-white shadow-sm h-12 p-1 border">
               <TabsTrigger value="dashboard" className="gap-2"><LayoutDashboard className="w-4 h-4" /> Overview</TabsTrigger>
               <TabsTrigger value="questions" className="gap-2"><FileQuestion className="w-4 h-4" /> Questions</TabsTrigger>
-              <TabsTrigger value="results" className="gap-2"><Users className="w-4 h-4" /> Participants & Promotion</TabsTrigger>
+              <TabsTrigger value="results" className="gap-2"><Users className="w-4 h-4" /> Participants</TabsTrigger>
               <TabsTrigger value="rounds" className="gap-2"><Trophy className="w-4 h-4" /> Rounds</TabsTrigger>
             </TabsList>
 
@@ -327,7 +366,7 @@ export default function AdminDashboard() {
                   <TableBody>
                     {questions.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={3} className="h-32 text-center text-muted-foreground">No questions found. Add one to get started.</TableCell>
+                        <TableCell colSpan={3} className="h-32 text-center text-muted-foreground">No questions found.</TableCell>
                       </TableRow>
                     ) : (
                       questions.map((q) => (
@@ -360,14 +399,14 @@ export default function AdminDashboard() {
               <CardHeader className="bg-white border-b py-6">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                   <div>
-                    <CardTitle className="text-2xl font-black">Participants & Promotion</CardTitle>
-                    <CardDescription>Review performance and qualify participants for the next round.</CardDescription>
+                    <CardTitle className="text-2xl font-black">Participants Management</CardTitle>
+                    <CardDescription>Review performance, correct data, and promote participants.</CardDescription>
                   </div>
                   <div className="flex gap-3 w-full md:w-auto">
                     <div className="relative flex-1 md:w-[300px]">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       <Input 
-                        placeholder="Search by name or college..." 
+                        placeholder="Search name or college..." 
                         className="pl-10 h-10 w-full" 
                         value={searchName}
                         onChange={(e) => setSearchName(e.target.value)}
@@ -390,71 +429,71 @@ export default function AdminDashboard() {
                   <TableHeader>
                     <TableRow className="bg-secondary/50 hover:bg-secondary/50">
                       <TableHead className="font-bold py-4">Participant Detail</TableHead>
-                      <TableHead className="font-bold py-4">Level</TableHead>
+                      <TableHead className="font-bold py-4">Attempt</TableHead>
                       <TableHead className="font-bold py-4 text-center">Score</TableHead>
-                      <TableHead className="font-bold py-4">Promotion Status</TableHead>
-                      <TableHead className="font-bold py-4 text-right pr-6">Promotion Actions</TableHead>
+                      <TableHead className="font-bold py-4">Status / Promotion</TableHead>
+                      <TableHead className="font-bold py-4 text-right pr-6">Admin Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredResults.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">No matching results found.</TableCell>
+                        <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">No records found.</TableCell>
                       </TableRow>
                     ) : (
                       filteredResults.map((r) => (
-                        <TableRow key={r.id} className="hover:bg-primary/5 transition-colors">
+                        <TableRow key={r.id} className="hover:bg-primary/5 transition-colors group">
                           <TableCell className="py-4">
                             <div className="flex flex-col">
                               <span className="font-black text-foreground">{r.participant_name}</span>
                               <span className="text-xs text-muted-foreground font-medium uppercase">{r.college_name}</span>
                             </div>
                           </TableCell>
-                          <TableCell className="py-4"><Badge variant="outline" className="font-bold">{r.level}</Badge></TableCell>
+                          <TableCell className="py-4">
+                            <Badge variant="outline" className="font-bold">{r.level}</Badge>
+                          </TableCell>
                           <TableCell className="text-center py-4">
                             <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 text-primary font-black">
                               {r.score}
                             </div>
                           </TableCell>
                           <TableCell className="py-4">
-                            {r.qualified_for ? (
-                              <Badge className="bg-green-600 text-white flex gap-1.5 w-fit border-0 font-bold px-3 py-1">
-                                <CheckCircle2 className="w-3.5 h-3.5" /> QUALIFIED FOR {r.qualified_for.toUpperCase()}
-                              </Badge>
-                            ) : (
-                              <Badge variant="secondary" className="bg-secondary text-muted-foreground border-0 font-bold px-3 py-1 opacity-60">NOT PROMOTED</Badge>
-                            )}
+                            <div className="flex flex-col gap-1.5">
+                              {r.qualified_for ? (
+                                <Badge className="bg-green-600 text-white flex gap-1.5 w-fit border-0 font-bold px-3 py-1">
+                                  <CheckCircle2 className="w-3.5 h-3.5" /> QUALIFIED: {r.qualified_for}
+                                </Badge>
+                              ) : (
+                                <Badge variant="secondary" className="bg-secondary text-muted-foreground border-0 font-bold px-3 py-1 opacity-60">NO PROMOTION</Badge>
+                              )}
+                              
+                              <div className="flex gap-1">
+                                {r.level === 'Basic' && r.qualified_for !== 'Intermediate' && (
+                                  <Button size="sm" variant="outline" className="h-7 text-[10px] font-bold" onClick={() => handlePromote(r.id, 'Intermediate')}>
+                                    <ArrowUpCircle className="w-3 h-3 mr-1" /> to Inter.
+                                  </Button>
+                                )}
+                                {r.level === 'Intermediate' && r.qualified_for !== 'Hard' && (
+                                  <Button size="sm" variant="outline" className="h-7 text-[10px] font-bold" onClick={() => handlePromote(r.id, 'Hard')}>
+                                    <ArrowUpCircle className="w-3 h-3 mr-1" /> to Hard
+                                  </Button>
+                                )}
+                                {r.qualified_for && (
+                                  <Button size="sm" variant="ghost" className="h-7 text-[10px] text-destructive font-bold" onClick={() => handlePromote(r.id, null)}>
+                                    <XCircle className="w-3 h-3 mr-1" /> Revoke
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
                           </TableCell>
                           <TableCell className="text-right py-4 pr-6">
-                            <div className="flex justify-end gap-2">
-                              {r.level === 'Basic' && r.qualified_for !== 'Intermediate' && (
-                                <Button 
-                                  size="sm" 
-                                  className="bg-primary hover:bg-primary/90 h-9 font-bold shadow-sm"
-                                  onClick={() => handlePromote(r.id, 'Intermediate')}
-                                >
-                                  <ArrowUpCircle className="w-3.5 h-3.5 mr-1.5" /> to Intermediate
-                                </Button>
-                              )}
-                              {r.level === 'Intermediate' && r.qualified_for !== 'Hard' && (
-                                <Button 
-                                  size="sm" 
-                                  className="bg-accent hover:bg-accent/90 h-9 font-bold shadow-sm"
-                                  onClick={() => handlePromote(r.id, 'Hard')}
-                                >
-                                  <ArrowUpCircle className="w-3.5 h-3.5 mr-1.5" /> to Hard
-                                </Button>
-                              )}
-                              {r.qualified_for && (
-                                <Button 
-                                  size="sm" 
-                                  variant="ghost" 
-                                  className="text-destructive hover:bg-destructive/10 h-9 font-bold"
-                                  onClick={() => handlePromote(r.id, null)}
-                                >
-                                  <XCircle className="w-3.5 h-3.5 mr-1.5" /> Revoke
-                                </Button>
-                              )}
+                            <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Button size="icon" variant="ghost" onClick={() => setIsEditingParticipant(r)} className="h-9 w-9 text-primary hover:bg-primary/10">
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <Button size="icon" variant="ghost" onClick={() => handleDeleteParticipant(r.id)} className="h-9 w-9 text-destructive hover:bg-destructive/10">
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -471,7 +510,7 @@ export default function AdminDashboard() {
                 <Card className="border-0 shadow-lg">
                   <CardHeader className="border-b bg-white"><CardTitle className="text-xl font-black">Competition Phase Control</CardTitle></CardHeader>
                   <CardContent className="pt-6">
-                   <p className="text-sm text-muted-foreground mb-6">Manage the active status and visibility of challenge phases.</p>
+                   <p className="text-sm text-muted-foreground mb-6">Manage active status of quiz levels.</p>
                    {rounds.length === 0 ? (
                       <div className="p-12 text-center border-2 border-dashed rounded-xl border-secondary">
                         <Trophy className="w-12 h-12 text-secondary mx-auto mb-2" />
@@ -497,6 +536,55 @@ export default function AdminDashboard() {
              </div>
           </TabsContent>
         </Tabs>
+
+        {/* Participant Edit Dialog */}
+        <Dialog open={isEditingParticipant !== null} onOpenChange={(open) => !open && setIsEditingParticipant(null)}>
+          <DialogContent className="max-w-md">
+            <form onSubmit={handleSaveParticipant} className="space-y-4">
+              <DialogHeader>
+                <DialogTitle className="text-2xl font-black flex items-center gap-2">
+                  <UserCog className="w-6 h-6 text-primary" /> Edit Participant
+                </DialogTitle>
+                <DialogDescription>Modify results or identity details for this attempt.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-bold">Full Name</label>
+                  <Input name="participant_name" defaultValue={isEditingParticipant?.participant_name} required />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-bold">College / Organization</label>
+                  <Input name="college_name" defaultValue={isEditingParticipant?.college_name} required />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold">Score</label>
+                    <Input name="score" type="number" defaultValue={isEditingParticipant?.score} required />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold">Time Taken (Sec)</label>
+                    <Input name="time_taken" type="number" defaultValue={isEditingParticipant?.time_taken} required />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-bold">Attempt Level</label>
+                  <Select name="level" defaultValue={isEditingParticipant?.level}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Basic">Basic</SelectItem>
+                      <SelectItem value="Intermediate">Intermediate</SelectItem>
+                      <SelectItem value="Hard">Hard</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <DialogFooter className="gap-2">
+                <Button type="button" variant="ghost" onClick={() => setIsEditingParticipant(null)} className="font-bold">Cancel</Button>
+                <Button type="submit" className="font-black px-8">Save Changes</Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );
