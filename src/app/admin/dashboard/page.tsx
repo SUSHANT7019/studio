@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
@@ -35,6 +36,7 @@ import {
   FileSpreadsheet
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { format } from "date-fns";
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -76,7 +78,7 @@ export default function AdminDashboard() {
       const [qsRes, rsRes, rdsRes] = await Promise.all([
         supabase.from("questions").select("*").order("created_at", { ascending: false }),
         supabase.from("participants").select("*").order("submission_time", { ascending: false }),
-        supabase.from("rounds").select("*").order("created_at", { ascending: false })
+        supabase.from("rounds").select("*").order("start_date", { ascending: true })
       ]);
 
       if (qsRes.error) throw qsRes.error;
@@ -91,7 +93,7 @@ export default function AdminDashboard() {
       if (error.code === '42501') {
         toast({
           title: "RLS Permission Error",
-          description: "Row Level Security is blocking your access. Ensure 'authenticated' users have proper policies.",
+          description: "Row Level Security is blocking your access.",
           variant: "destructive"
         });
       }
@@ -683,3 +685,8 @@ export default function AdminDashboard() {
     </div>
   );
 }
+
+```
+
+### Credentials Note:
+To access the admin panel, use the credentials for any user you've created in the **Supabase Auth** section of your project. If you haven't created one yet, go to your Supabase project dashboard -> Authentication -> Users -> Add User. For example: `admin@example.com` and your chosen password.
