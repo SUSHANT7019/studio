@@ -1,14 +1,15 @@
-
 "use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
-import { GraduationCap, Award, BrainCircuit } from "lucide-react";
+import { GraduationCap, Award, BrainCircuit, AlertCircle } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
 
 export default function Home() {
   const router = useRouter();
@@ -19,14 +20,57 @@ export default function Home() {
   });
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const checkEligibility = async () => {
+    // Basic level is always allowed
+    if (formData.level === "Basic") return true;
+
+    // Check if participant is qualified for the selected level
+    const { data, error } = await supabase
+      .from("participants")
+      .select("qualified_for")
+      .eq("participant_name", formData.name)
+      .eq("college_name", formData.college)
+      .eq("qualified_for", formData.level);
+
+    if (error) {
+      console.error("Eligibility check error:", error);
+      return false;
+    }
+
+    return data && data.length > 0;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name || !formData.college) return;
 
     setLoading(true);
-    // Persist basic info in session storage for the quiz page
-    sessionStorage.setItem("quiz_participant", JSON.stringify(formData));
-    router.push("/quiz");
+
+    try {
+      const isEligible = await checkEligibility();
+
+      if (!isEligible) {
+        toast({
+          title: "Not Eligible",
+          description: `You must be qualified by an administrator to attempt the ${formData.level} level.`,
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Persist basic info in session storage for the quiz page
+      sessionStorage.setItem("quiz_participant", JSON.stringify(formData));
+      router.push("/quiz");
+    } catch (err) {
+      console.error("Submission error:", err);
+      toast({
+        title: "Connection Error",
+        description: "Failed to verify eligibility. Please check your internet.",
+        variant: "destructive",
+      });
+      setLoading(false);
+    }
   };
 
   return (
@@ -69,7 +113,12 @@ export default function Home() {
               </div>
             </div>
             <div className="space-y-3">
-              <Label className="text-sm font-semibold">Difficulty Level</Label>
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-semibold">Difficulty Level</Label>
+                {formData.level !== "Basic" && (
+                  <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold uppercase tracking-tighter">Qualification Required</span>
+                )}
+              </div>
               <RadioGroup
                 value={formData.level}
                 onValueChange={(val) => setFormData({ ...formData, level: val })}
@@ -83,7 +132,7 @@ export default function Home() {
                     <RadioGroupItem value="Basic" id="level-basic" />
                     <div>
                       <div className="font-bold">Basic</div>
-                      <div className="text-xs text-muted-foreground">15 Questions • 10 Minutes</div>
+                      <div className="text-xs text-muted-foreground">Open to All • 15 Questions</div>
                     </div>
                   </div>
                   <Award className={`w-5 h-5 ${formData.level === 'Basic' ? 'text-primary' : 'text-muted-foreground'}`} />
@@ -96,7 +145,7 @@ export default function Home() {
                     <RadioGroupItem value="Intermediate" id="level-intermediate" />
                     <div>
                       <div className="font-bold">Intermediate</div>
-                      <div className="text-xs text-muted-foreground">15 Questions • 8 Minutes</div>
+                      <div className="text-xs text-muted-foreground">Admin Invitation Only</div>
                     </div>
                   </div>
                   <Award className={`w-5 h-5 ${formData.level === 'Intermediate' ? 'text-primary' : 'text-muted-foreground'}`} />
@@ -109,7 +158,7 @@ export default function Home() {
                     <RadioGroupItem value="Hard" id="level-hard" />
                     <div>
                       <div className="font-bold">Hard</div>
-                      <div className="text-xs text-muted-foreground">15 Questions • 5 Minutes</div>
+                      <div className="text-xs text-muted-foreground">Finalists Only</div>
                     </div>
                   </div>
                   <Award className={`w-5 h-5 ${formData.level === 'Hard' ? 'text-primary' : 'text-muted-foreground'}`} />
@@ -121,7 +170,7 @@ export default function Home() {
               className="w-full bg-primary hover:bg-primary/90 text-white font-bold h-12 text-lg rounded-lg shadow-lg"
               disabled={loading || !formData.name || !formData.college}
             >
-              {loading ? "Initializing..." : "Start Quiz"}
+              {loading ? "Checking Eligibility..." : "Start Quiz"}
             </Button>
           </form>
         </CardContent>

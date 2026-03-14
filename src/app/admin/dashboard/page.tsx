@@ -24,7 +24,9 @@ import {
   LogOut, 
   Search, 
   Filter,
-  ShieldAlert 
+  ShieldAlert,
+  ArrowUpCircle,
+  CheckCircle2
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
@@ -101,6 +103,20 @@ export default function AdminDashboard() {
     toast({ title: "Success", description: "Question bank updated." });
   };
 
+  const handlePromote = async (participantId: string, nextLevel: string) => {
+    const { error } = await supabase
+      .from("participants")
+      .update({ qualified_for: nextLevel })
+      .eq("id", participantId);
+
+    if (error) {
+      toast({ title: "Error promoting participant", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Promoted!", description: `Participant is now eligible for ${nextLevel}.` });
+      fetchData();
+    }
+  };
+
   const formatTimeTaken = (seconds: any) => {
     if (typeof seconds !== 'number') return "N/A";
     const m = Math.floor(seconds / 60);
@@ -125,13 +141,14 @@ export default function AdminDashboard() {
   }, [results, filterLevel, searchName, scoreFilter]);
 
   const exportToCSV = () => {
-    const headers = ["Participant Name", "College Name", "Level", "Score", "Time Taken (s)", "Submission Time"];
+    const headers = ["Participant Name", "College Name", "Level", "Score", "Time Taken (s)", "Qualified For", "Submission Time"];
     const rows = filteredResults.map(r => [
       `"${r.participant_name}"`,
       `"${r.college_name}"`,
       r.level,
       r.score,
       r.time_taken,
+      r.qualified_for || "None",
       new Date(r.submission_time).toLocaleString()
     ]);
 
@@ -207,8 +224,8 @@ export default function AdminDashboard() {
                </Card>
                <Card className="border-l-4 border-l-orange-500 shadow-sm hover:shadow-md transition-shadow">
                  <CardHeader className="pb-2">
-                   <CardDescription className="text-xs font-bold uppercase tracking-wider">Hard Attempts</CardDescription>
-                   <CardTitle className="text-4xl font-black">{results.filter(r => r.level === 'Hard').length}</CardTitle>
+                   <CardDescription className="text-xs font-bold uppercase tracking-wider">Qualified Next Round</CardDescription>
+                   <CardTitle className="text-4xl font-black">{results.filter(r => r.qualified_for).length}</CardTitle>
                  </CardHeader>
                </Card>
             </div>
@@ -377,15 +394,6 @@ export default function AdminDashboard() {
                         <SelectItem value="Hard">Hard</SelectItem>
                       </SelectContent>
                     </Select>
-                    <Select value={scoreFilter} onValueChange={setScoreFilter}>
-                      <SelectTrigger className="w-[140px] bg-white"><SelectValue placeholder="Score" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="All">All Scores</SelectItem>
-                        <SelectItem value="High">12+ (High)</SelectItem>
-                        <SelectItem value="Medium">7-11 (Medium)</SelectItem>
-                        <SelectItem value="Low">{"< 7"} (Low)</SelectItem>
-                      </SelectContent>
-                    </Select>
                   </div>
                 </div>
               </CardHeader>
@@ -398,8 +406,8 @@ export default function AdminDashboard() {
                         <TableHead>College</TableHead>
                         <TableHead>Level</TableHead>
                         <TableHead className="text-center">Score</TableHead>
-                        <TableHead>Time Taken</TableHead>
-                        <TableHead>Submission</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Promote</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -409,8 +417,39 @@ export default function AdminDashboard() {
                           <TableCell className="text-muted-foreground">{r.college_name}</TableCell>
                           <TableCell><Badge variant="outline">{r.level}</Badge></TableCell>
                           <TableCell className="text-center font-black text-primary text-lg">{r.score}</TableCell>
-                          <TableCell>{formatTimeTaken(r.time_taken)}</TableCell>
-                          <TableCell className="text-xs">{new Date(r.submission_time).toLocaleString()}</TableCell>
+                          <TableCell>
+                            {r.qualified_for ? (
+                              <Badge className="bg-green-500 text-white flex gap-1 w-fit">
+                                <CheckCircle2 className="w-3 h-3" /> Qualified {r.qualified_for}
+                              </Badge>
+                            ) : (
+                              <Badge variant="secondary">Pending Review</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              {r.level === 'Basic' && !r.qualified_for && (
+                                <Button 
+                                  size="sm" 
+                                  variant="outline" 
+                                  className="gap-1 border-primary text-primary hover:bg-primary hover:text-white"
+                                  onClick={() => handlePromote(r.id, 'Intermediate')}
+                                >
+                                  <ArrowUpCircle className="w-4 h-4" /> to Intermediate
+                                </Button>
+                              )}
+                              {r.level === 'Intermediate' && !r.qualified_for && (
+                                <Button 
+                                  size="sm" 
+                                  variant="outline" 
+                                  className="gap-1 border-accent text-accent hover:bg-accent hover:text-white"
+                                  onClick={() => handlePromote(r.id, 'Hard')}
+                                >
+                                  <ArrowUpCircle className="w-4 h-4" /> to Hard
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
                         </TableRow>
                       ))}
                       {filteredResults.length === 0 && (
