@@ -16,7 +16,6 @@ import {
   LayoutDashboard, 
   FileQuestion, 
   Users, 
-  Trophy, 
   Download, 
   Plus, 
   Trash2, 
@@ -40,7 +39,6 @@ export default function AdminDashboard() {
   const router = useRouter();
   const [questions, setQuestions] = useState<any[]>([]);
   const [results, setResults] = useState<any[]>([]);
-  const [rounds, setRounds] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState<any>(null);
   const [isEditingParticipant, setIsEditingParticipant] = useState<any>(null);
@@ -73,10 +71,9 @@ export default function AdminDashboard() {
     setDbError(null);
     
     try {
-      const [qsRes, rsRes, rdsRes] = await Promise.all([
+      const [qsRes, rsRes] = await Promise.all([
         supabase.from("questions").select("*").order("created_at", { ascending: false }),
-        supabase.from("participants").select("*").order("submission_time", { ascending: false }),
-        supabase.from("rounds").select("*").order("start_date", { ascending: true })
+        supabase.from("participants").select("*").order("submission_time", { ascending: false })
       ]);
 
       if (qsRes.error) throw qsRes.error;
@@ -84,7 +81,6 @@ export default function AdminDashboard() {
       
       setQuestions(qsRes.data || []);
       setResults(rsRes.data || []);
-      setRounds(rdsRes.data || []);
     } catch (error: any) {
       console.error("Fetch error:", error);
       setDbError(error.message);
@@ -316,7 +312,6 @@ export default function AdminDashboard() {
               <TabsTrigger value="dashboard" className="gap-2"><LayoutDashboard className="w-4 h-4" /> Overview</TabsTrigger>
               <TabsTrigger value="questions" className="gap-2"><FileQuestion className="w-4 h-4" /> Questions</TabsTrigger>
               <TabsTrigger value="results" className="gap-2"><Users className="w-4 h-4" /> Participants</TabsTrigger>
-              <TabsTrigger value="rounds" className="gap-2"><Trophy className="w-4 h-4" /> Rounds</TabsTrigger>
             </TabsList>
 
             <Button onClick={exportResultsToCSV} variant="outline" className="gap-2 bg-white border-primary/20 text-primary hover:bg-primary/5">
@@ -597,37 +592,6 @@ export default function AdminDashboard() {
                 </Table>
               </CardContent>
             </Card>
-          </TabsContent>
-
-          <TabsContent value="rounds">
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card className="border-0 shadow-lg">
-                  <CardHeader className="border-b bg-white"><CardTitle className="text-xl font-black">Competition Phase Control</CardTitle></CardHeader>
-                  <CardContent className="pt-6">
-                   <p className="text-sm text-muted-foreground mb-6">Manage active status of quiz levels.</p>
-                   {rounds.length === 0 ? (
-                      <div className="p-12 text-center border-2 border-dashed rounded-xl border-secondary">
-                        <Trophy className="w-12 h-12 text-secondary mx-auto mb-2" />
-                        <p className="font-bold text-muted-foreground">No active rounds configured.</p>
-                      </div>
-                   ) : (
-                     rounds.map(rd => (
-                       <div key={rd.id} className="p-5 border rounded-xl mb-3 flex justify-between items-center bg-white shadow-sm border-secondary/50 hover:border-primary/50 transition-colors">
-                          <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 rounded-full bg-green-100 text-green-700 flex items-center justify-center font-black">
-                              {rd.level.charAt(0)}
-                            </div>
-                            <div>
-                              <p className="font-black text-foreground">{rd.round_name}</p>
-                              <p className="text-[10px] text-muted-foreground font-black uppercase tracking-wider">{rd.level} Round</p>
-                            </div>
-                          </div>
-                          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 font-bold px-3">ACTIVE</Badge>
-                       </div>
-                     ))
-                   )}
-                </CardContent></Card>
-             </div>
           </TabsContent>
         </Tabs>
 
