@@ -26,7 +26,8 @@ import {
   Filter,
   ShieldAlert,
   ArrowUpCircle,
-  CheckCircle2
+  CheckCircle2,
+  XCircle
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
@@ -42,7 +43,6 @@ export default function AdminDashboard() {
   // Filter states
   const [filterLevel, setFilterLevel] = useState("All");
   const [searchName, setSearchName] = useState("");
-  const [scoreFilter, setScoreFilter] = useState("All");
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -103,25 +103,19 @@ export default function AdminDashboard() {
     toast({ title: "Success", description: "Question bank updated." });
   };
 
-  const handlePromote = async (participantId: string, nextLevel: string) => {
+  const handlePromote = async (participantId: string, nextLevel: string | null) => {
     const { error } = await supabase
       .from("participants")
       .update({ qualified_for: nextLevel })
       .eq("id", participantId);
 
     if (error) {
-      toast({ title: "Error promoting participant", description: error.message, variant: "destructive" });
+      toast({ title: "Error updating status", description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Promoted!", description: `Participant is now eligible for ${nextLevel}.` });
+      const action = nextLevel ? `Promoted to ${nextLevel}` : "Qualification removed";
+      toast({ title: "Updated!", description: action });
       fetchData();
     }
-  };
-
-  const formatTimeTaken = (seconds: any) => {
-    if (typeof seconds !== 'number') return "N/A";
-    const m = Math.floor(seconds / 60);
-    const s = Math.floor(seconds % 60);
-    return `${m}m ${s}s`;
   };
 
   const filteredResults = useMemo(() => {
@@ -130,15 +124,9 @@ export default function AdminDashboard() {
       const matchesName = 
         r.participant_name.toLowerCase().includes(searchName.toLowerCase()) || 
         r.college_name.toLowerCase().includes(searchName.toLowerCase());
-      
-      let matchesScore = true;
-      if (scoreFilter === "High") matchesScore = r.score >= 12;
-      if (scoreFilter === "Medium") matchesScore = r.score >= 7 && r.score < 12;
-      if (scoreFilter === "Low") matchesScore = r.score < 7;
-
-      return matchesLevel && matchesName && matchesScore;
+      return matchesLevel && matchesName;
     });
-  }, [results, filterLevel, searchName, scoreFilter]);
+  }, [results, filterLevel, searchName]);
 
   const exportToCSV = () => {
     const headers = ["Participant Name", "College Name", "Level", "Score", "Time Taken (s)", "Qualified For", "Submission Time"];
@@ -158,7 +146,7 @@ export default function AdminDashboard() {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `techquiz_results_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute("download", `techquiz_results.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -184,84 +172,47 @@ export default function AdminDashboard() {
       </header>
 
       <main className="p-4 md:p-8 max-w-[1600px] mx-auto w-full">
-        <Tabs defaultValue="dashboard" className="space-y-6">
+        <Tabs defaultValue="results" className="space-y-6">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <TabsList className="bg-white shadow-sm h-12 p-1 border">
-              <TabsTrigger value="dashboard" className="gap-2"><LayoutDashboard className="w-4 h-4" /> Dashboard</TabsTrigger>
+              <TabsTrigger value="dashboard" className="gap-2"><LayoutDashboard className="w-4 h-4" /> Stats</TabsTrigger>
               <TabsTrigger value="questions" className="gap-2"><FileQuestion className="w-4 h-4" /> Questions</TabsTrigger>
-              <TabsTrigger value="results" className="gap-2"><Users className="w-4 h-4" /> Results</TabsTrigger>
+              <TabsTrigger value="results" className="gap-2"><Users className="w-4 h-4" /> Results & Promotion</TabsTrigger>
               <TabsTrigger value="rounds" className="gap-2"><Trophy className="w-4 h-4" /> Rounds</TabsTrigger>
             </TabsList>
 
             <div className="flex gap-2">
                <Button onClick={exportToCSV} variant="outline" className="gap-2 bg-white">
-                 <Download className="w-4 h-4" /> Export Results
+                 <Download className="w-4 h-4" /> Export CSV
                </Button>
             </div>
           </div>
 
           <TabsContent value="dashboard">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-               <Card className="border-l-4 border-l-primary shadow-sm hover:shadow-md transition-shadow">
+               <Card className="border-l-4 border-l-primary shadow-sm">
                  <CardHeader className="pb-2">
                    <CardDescription className="text-xs font-bold uppercase tracking-wider">Total Participants</CardDescription>
                    <CardTitle className="text-4xl font-black">{results.length}</CardTitle>
                  </CardHeader>
                </Card>
-               <Card className="border-l-4 border-l-accent shadow-sm hover:shadow-md transition-shadow">
-                 <CardHeader className="pb-2">
-                   <CardDescription className="text-xs font-bold uppercase tracking-wider">Avg. Score</CardDescription>
-                   <CardTitle className="text-4xl font-black">
-                    {results.length > 0 ? (results.reduce((acc, r) => acc + r.score, 0) / results.length).toFixed(1) : 0}
-                   </CardTitle>
-                 </CardHeader>
-               </Card>
-               <Card className="border-l-4 border-l-green-500 shadow-sm hover:shadow-md transition-shadow">
-                 <CardHeader className="pb-2">
-                   <CardDescription className="text-xs font-bold uppercase tracking-wider">Bank Size</CardDescription>
-                   <CardTitle className="text-4xl font-black">{questions.length}</CardTitle>
-                 </CardHeader>
-               </Card>
-               <Card className="border-l-4 border-l-orange-500 shadow-sm hover:shadow-md transition-shadow">
+               <Card className="border-l-4 border-l-green-500 shadow-sm">
                  <CardHeader className="pb-2">
                    <CardDescription className="text-xs font-bold uppercase tracking-wider">Qualified Next Round</CardDescription>
                    <CardTitle className="text-4xl font-black">{results.filter(r => r.qualified_for).length}</CardTitle>
                  </CardHeader>
                </Card>
+               <Card className="border-l-4 border-l-accent shadow-sm">
+                 <CardHeader className="pb-2">
+                   <CardDescription className="text-xs font-bold uppercase tracking-wider">Bank Questions</CardDescription>
+                   <CardTitle className="text-4xl font-black">{questions.length}</CardTitle>
+                 </CardHeader>
+               </Card>
             </div>
-
-            <Card className="mt-8">
-              <CardHeader>
-                <CardTitle>Recent Activity</CardTitle>
-                <CardDescription>Latest participant submissions across all levels</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Participant</TableHead>
-                      <TableHead>Level</TableHead>
-                      <TableHead>Score</TableHead>
-                      <TableHead>Time</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {results.slice(0, 5).map((r) => (
-                      <TableRow key={r.id}>
-                        <TableCell className="font-medium">{r.participant_name}</TableCell>
-                        <TableCell><Badge variant="outline">{r.level}</Badge></TableCell>
-                        <TableCell className="font-bold text-primary">{r.score} / 15</TableCell>
-                        <TableCell className="text-xs text-muted-foreground">{new Date(r.submission_time).toLocaleTimeString()}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
           </TabsContent>
 
           <TabsContent value="questions">
-            <Card className="shadow-lg border-t-4 border-t-primary">
+            <Card className="shadow-lg">
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
                   <CardTitle>Question Management</CardTitle>
@@ -269,100 +220,76 @@ export default function AdminDashboard() {
                 </div>
                 <Dialog open={isEditing !== null} onOpenChange={(open) => !open && setIsEditing(null)}>
                   <DialogTrigger asChild>
-                    <Button onClick={() => setIsEditing({})} className="gap-2 h-11 px-6">
-                      <Plus className="w-5 h-5" /> Add Question
+                    <Button onClick={() => setIsEditing({})} className="gap-2">
+                      <Plus className="w-5 h-5" /> Add New Question
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                     <form onSubmit={handleSaveQuestion} className="space-y-4">
-                      <DialogHeader>
-                        <DialogTitle>{isEditing?.id ? "Edit Technical Question" : "New Technical Question"}</DialogTitle>
-                      </DialogHeader>
-                      <div className="grid grid-cols-1 gap-4 py-4">
+                      <DialogHeader><DialogTitle>{isEditing?.id ? "Edit Question" : "New Question"}</DialogTitle></DialogHeader>
+                      <div className="space-y-4 py-4">
                         <div className="space-y-2">
                           <label className="text-sm font-bold">Question Text</label>
-                          <Textarea name="question_text" defaultValue={isEditing?.question_text} required placeholder="Enter the technical question logic..." className="min-h-[100px]" />
+                          <Textarea name="question_text" defaultValue={isEditing?.question_text} required placeholder="Question logic..." />
                         </div>
                         <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <label className="text-sm font-bold">Option A</label>
-                            <Input name="option_a" defaultValue={isEditing?.option_a} required />
-                          </div>
-                          <div className="space-y-2">
-                            <label className="text-sm font-bold">Option B</label>
-                            <Input name="option_b" defaultValue={isEditing?.option_b} required />
-                          </div>
-                          <div className="space-y-2">
-                            <label className="text-sm font-bold">Option C</label>
-                            <Input name="option_c" defaultValue={isEditing?.option_c} required />
-                          </div>
-                          <div className="space-y-2">
-                            <label className="text-sm font-bold">Option D</label>
-                            <Input name="option_d" defaultValue={isEditing?.option_d} required />
-                          </div>
+                          <Input name="option_a" defaultValue={isEditing?.option_a} placeholder="Option A" required />
+                          <Input name="option_b" defaultValue={isEditing?.option_b} placeholder="Option B" required />
+                          <Input name="option_c" defaultValue={isEditing?.option_c} placeholder="Option C" required />
+                          <Input name="option_d" defaultValue={isEditing?.option_d} placeholder="Option D" required />
                         </div>
                         <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <label className="text-sm font-bold">Correct Answer</label>
-                            <Select name="correct_answer" defaultValue={isEditing?.correct_answer || "A"}>
-                              <SelectTrigger><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="A">Option A</SelectItem>
-                                <SelectItem value="B">Option B</SelectItem>
-                                <SelectItem value="C">Option C</SelectItem>
-                                <SelectItem value="D">Option D</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="space-y-2">
-                            <label className="text-sm font-bold">Difficulty Level</label>
-                            <Select name="difficulty_level" defaultValue={isEditing?.difficulty_level || "Basic"}>
-                              <SelectTrigger><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="Basic">Basic</SelectItem>
-                                <SelectItem value="Intermediate">Intermediate</SelectItem>
-                                <SelectItem value="Hard">Hard</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
+                          <Select name="correct_answer" defaultValue={isEditing?.correct_answer || "A"}>
+                            <SelectTrigger><SelectValue placeholder="Correct Answer" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="A">A</SelectItem>
+                              <SelectItem value="B">B</SelectItem>
+                              <SelectItem value="C">C</SelectItem>
+                              <SelectItem value="D">D</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Select name="difficulty_level" defaultValue={isEditing?.difficulty_level || "Basic"}>
+                            <SelectTrigger><SelectValue placeholder="Level" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Basic">Basic</SelectItem>
+                              <SelectItem value="Intermediate">Intermediate</SelectItem>
+                              <SelectItem value="Hard">Hard</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
                       </div>
                       <DialogFooter>
                         <Button type="button" variant="outline" onClick={() => setIsEditing(null)}>Cancel</Button>
-                        <Button type="submit">Save Changes</Button>
+                        <Button type="submit">Save</Button>
                       </DialogFooter>
                     </form>
                   </DialogContent>
                 </Dialog>
               </CardHeader>
               <CardContent>
-                <div className="border rounded-lg overflow-hidden">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-secondary/50">
-                        <TableHead className="w-[450px]">Question</TableHead>
-                        <TableHead>Correct</TableHead>
-                        <TableHead>Level</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-secondary/50">
+                      <TableHead className="w-[450px]">Question</TableHead>
+                      <TableHead>Correct</TableHead>
+                      <TableHead>Level</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {questions.map((q) => (
+                      <TableRow key={q.id}>
+                        <TableCell className="font-medium line-clamp-1">{q.question_text}</TableCell>
+                        <TableCell><Badge className="bg-green-100 text-green-800">{q.correct_answer}</Badge></TableCell>
+                        <TableCell><Badge variant="secondary">{q.difficulty_level}</Badge></TableCell>
+                        <TableCell className="text-right flex justify-end gap-1">
+                          <Button size="icon" variant="ghost" onClick={() => setIsEditing(q)}><Edit className="w-4 h-4" /></Button>
+                          <Button size="icon" variant="ghost" className="text-destructive hover:bg-destructive/10" onClick={() => handleDeleteQuestion(q.id)}><Trash2 className="w-4 h-4" /></Button>
+                        </TableCell>
                       </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {questions.map((q) => (
-                        <TableRow key={q.id}>
-                          <TableCell className="font-medium">
-                            <p className="line-clamp-2">{q.question_text}</p>
-                          </TableCell>
-                          <TableCell><Badge className="bg-green-100 text-green-800 hover:bg-green-100 border-green-200">{q.correct_answer}</Badge></TableCell>
-                          <TableCell><Badge variant="secondary">{q.difficulty_level}</Badge></TableCell>
-                          <TableCell className="text-right flex justify-end gap-1">
-                            <Button size="icon" variant="ghost" onClick={() => setIsEditing(q)}><Edit className="w-4 h-4" /></Button>
-                            <Button size="icon" variant="ghost" className="text-destructive hover:bg-destructive/10" onClick={() => handleDeleteQuestion(q.id)}><Trash2 className="w-4 h-4" /></Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                    ))}
+                  </TableBody>
+                </Table>
               </CardContent>
             </Card>
           </TabsContent>
@@ -372,8 +299,8 @@ export default function AdminDashboard() {
               <CardHeader>
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                   <div>
-                    <CardTitle>Competition Results</CardTitle>
-                    <CardDescription>Real-time participant leaderboard and metrics</CardDescription>
+                    <CardTitle>Results & Promotion Dashboard</CardTitle>
+                    <CardDescription>Identify top performers and qualify them for higher levels.</CardDescription>
                   </div>
                   <div className="flex flex-wrap gap-3">
                     <div className="relative">
@@ -401,13 +328,13 @@ export default function AdminDashboard() {
                 <div className="border rounded-lg">
                   <Table>
                     <TableHeader>
-                      <TableRow className="bg-secondary/50">
+                      <TableRow className="bg-secondary/50 font-bold">
                         <TableHead>Participant</TableHead>
                         <TableHead>College</TableHead>
-                        <TableHead>Level</TableHead>
+                        <TableHead>Attempted Level</TableHead>
                         <TableHead className="text-center">Score</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Promote</TableHead>
+                        <TableHead>Current Status</TableHead>
+                        <TableHead className="text-right">Promotion Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -419,33 +346,44 @@ export default function AdminDashboard() {
                           <TableCell className="text-center font-black text-primary text-lg">{r.score}</TableCell>
                           <TableCell>
                             {r.qualified_for ? (
-                              <Badge className="bg-green-500 text-white flex gap-1 w-fit">
-                                <CheckCircle2 className="w-3 h-3" /> Qualified {r.qualified_for}
+                              <Badge className="bg-green-600 text-white flex gap-1 w-fit">
+                                <CheckCircle2 className="w-3 h-3" /> Qualified: {r.qualified_for}
                               </Badge>
                             ) : (
-                              <Badge variant="secondary">Pending Review</Badge>
+                              <Badge variant="secondary" className="bg-amber-100 text-amber-700">Not Promoted</Badge>
                             )}
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-2">
-                              {r.level === 'Basic' && !r.qualified_for && (
+                              {/* Promotion Logic: Basic -> Intermediate, Intermediate -> Hard */}
+                              {r.level === 'Basic' && r.qualified_for !== 'Intermediate' && r.qualified_for !== 'Hard' && (
                                 <Button 
                                   size="sm" 
-                                  variant="outline" 
-                                  className="gap-1 border-primary text-primary hover:bg-primary hover:text-white"
+                                  variant="default" 
+                                  className="gap-1 bg-primary hover:bg-primary/90"
                                   onClick={() => handlePromote(r.id, 'Intermediate')}
                                 >
-                                  <ArrowUpCircle className="w-4 h-4" /> to Intermediate
+                                  <ArrowUpCircle className="w-4 h-4" /> Qualify for Intermediate
                                 </Button>
                               )}
-                              {r.level === 'Intermediate' && !r.qualified_for && (
+                              {r.level === 'Intermediate' && r.qualified_for !== 'Hard' && (
                                 <Button 
                                   size="sm" 
-                                  variant="outline" 
-                                  className="gap-1 border-accent text-accent hover:bg-accent hover:text-white"
+                                  variant="default" 
+                                  className="gap-1 bg-accent hover:bg-accent/90"
                                   onClick={() => handlePromote(r.id, 'Hard')}
                                 >
-                                  <ArrowUpCircle className="w-4 h-4" /> to Hard
+                                  <ArrowUpCircle className="w-4 h-4" /> Qualify for Hard
+                                </Button>
+                              )}
+                              {r.qualified_for && (
+                                <Button 
+                                  size="sm" 
+                                  variant="ghost" 
+                                  className="text-destructive hover:bg-destructive/10"
+                                  onClick={() => handlePromote(r.id, null)}
+                                >
+                                  <XCircle className="w-4 h-4" /> Revoke
                                 </Button>
                               )}
                             </div>
@@ -455,10 +393,7 @@ export default function AdminDashboard() {
                       {filteredResults.length === 0 && (
                         <TableRow>
                           <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
-                            <div className="flex flex-col items-center gap-2">
-                              <Filter className="w-8 h-8 opacity-20" />
-                              <p>No records found matching your current filters.</p>
-                            </div>
+                            No records found matching filters.
                           </TableCell>
                         </TableRow>
                       )}
@@ -470,58 +405,20 @@ export default function AdminDashboard() {
           </TabsContent>
 
           <TabsContent value="rounds">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Card className="col-span-1 shadow-md border-t-4 border-t-accent">
-                <CardHeader><CardTitle>Initialize Round</CardTitle></CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-bold">Round Name</label>
-                    <Input placeholder="e.g. Finals 2024" />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-bold">Target Level</label>
-                    <Select defaultValue="Hard">
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Basic">Basic</SelectItem>
-                        <SelectItem value="Intermediate">Intermediate</SelectItem>
-                        <SelectItem value="Hard">Hard</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <Button className="w-full bg-accent hover:bg-accent/90">Create Competition Phase</Button>
-                </CardContent>
-              </Card>
-
-              <Card className="col-span-2 shadow-md">
-                <CardHeader><CardTitle>Active Competition Phases</CardTitle></CardHeader>
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card><CardHeader><CardTitle>Active Phases</CardTitle></CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    {rounds.map((round) => (
-                      <div key={round.id} className="p-5 border rounded-xl flex justify-between items-center bg-white hover:border-primary/50 transition-colors shadow-sm">
-                        <div className="flex items-center gap-4">
-                          <div className="p-3 bg-primary/10 rounded-full"><Trophy className="text-primary w-5 h-5" /></div>
-                          <div>
-                            <h4 className="font-bold text-lg">{round.round_name}</h4>
-                            <p className="text-sm text-muted-foreground">Difficulty: {round.level}</p>
-                          </div>
+                   {rounds.map(rd => (
+                     <div key={rd.id} className="p-4 border rounded mb-2 flex justify-between items-center">
+                        <div>
+                          <p className="font-bold">{rd.round_name}</p>
+                          <p className="text-xs text-muted-foreground">Level: {rd.level}</p>
                         </div>
-                        <div className="flex gap-2">
-                          <Button variant="outline" size="sm">Analytics</Button>
-                          <Button size="sm" variant="destructive">End Phase</Button>
-                        </div>
-                      </div>
-                    ))}
-                    {rounds.length === 0 && (
-                      <div className="text-center py-12 border-2 border-dashed rounded-xl text-muted-foreground bg-secondary/20">
-                        <Trophy className="w-12 h-12 mx-auto mb-3 opacity-20" />
-                        <p className="font-medium">No competition rounds are currently active.</p>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+                        <Badge>Active</Badge>
+                     </div>
+                   ))}
+                </CardContent></Card>
+             </div>
           </TabsContent>
         </Tabs>
       </main>
