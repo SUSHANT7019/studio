@@ -1,9 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
-// These variables should be defined in your environment variables (e.g., .env.local)
-// We provide fallbacks here to prevent the 'createClient' function from throwing 
-// a "supabaseUrl is required" error during the initial build or if keys are missing.
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://your-project-id.supabase.co';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'your-anon-key';
+// Using the provided Supabase credentials as fallbacks to ensure the client initializes correctly.
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://gejwaqycddushksbhpit.supabase.co';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY || 'sb_publishable_EXLfMXT0C6cIHq6Fus59Jw_NarwuOnq';
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
