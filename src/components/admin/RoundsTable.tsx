@@ -67,3 +67,8 @@ export function RoundsTable({ rounds }: { rounds: Round[] }) {
               );
             })
           )}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
