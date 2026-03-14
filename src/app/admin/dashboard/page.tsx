@@ -32,7 +32,8 @@ import {
   FileSpreadsheet,
   ArrowUpCircle,
   XCircle,
-  Filter
+  Filter,
+  Trophy
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
@@ -522,13 +523,13 @@ export default function AdminDashboard() {
                     </Select>
 
                     <div className="flex items-center gap-2 ml-auto">
-                      <span className="text-xs font-bold text-muted-foreground whitespace-nowrap">Score:</span>
+                      <Trophy className="w-4 h-4 text-primary" />
                       <Select value={scoreFilterOperator} onValueChange={setScoreFilterOperator}>
-                        <SelectTrigger className="w-[130px] h-10 bg-white"><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="w-[80px] h-10 bg-white font-black"><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="greater">Greater/Equal</SelectItem>
-                          <SelectItem value="less">Less/Equal</SelectItem>
-                          <SelectItem value="equal">Exactly</SelectItem>
+                          <SelectItem value="greater">≥</SelectItem>
+                          <SelectItem value="less">≤</SelectItem>
+                          <SelectItem value="equal">=</SelectItem>
                         </SelectContent>
                       </Select>
                       <Input 
