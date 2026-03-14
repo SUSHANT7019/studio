@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
-import { GraduationCap, Award, BrainCircuit, ShieldCheck } from "lucide-react";
+import { GraduationCap, Award, BrainCircuit, ShieldCheck, Info } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 export default function Home() {
@@ -39,7 +39,22 @@ export default function Home() {
       .eq("qualified_for", formData.level);
 
     if (error) {
-      console.error("Eligibility Check Error:", error.message);
+      console.error("Eligibility Check Error:", error.message, error.code);
+      
+      // Handle RLS Permission Denied specifically
+      if (error.code === '42501') {
+        toast({
+          title: "Database Access Denied",
+          description: "Row Level Security (RLS) is blocking the check. Ensure the 'participants' table has a SELECT policy for 'anon' users.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Check Failed",
+          description: error.message,
+          variant: "destructive",
+        });
+      }
       return false;
     }
 
@@ -59,7 +74,7 @@ export default function Home() {
       if (!isEligible) {
         toast({
           title: "Access Restricted",
-          description: `You are not yet qualified for the ${formData.level} level. Please ensure your name/college matches exactly what you used in the previous round.`,
+          description: `Qualification for ${formData.level} not found. Please ensure your name/college matches exactly what an admin promoted.`,
           variant: "destructive",
         });
         setLoading(false);
@@ -103,11 +118,11 @@ export default function Home() {
               <Label htmlFor="name" className="text-sm font-semibold">Full Name</Label>
               <Input
                 id="name"
-                placeholder="Name used in previous rounds"
+                placeholder="Ex: John Doe"
                 required
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="focus-visible:ring-primary"
+                className="focus-visible:ring-primary h-11"
               />
             </div>
             <div className="space-y-2">
@@ -116,11 +131,11 @@ export default function Home() {
                 <GraduationCap className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
                   id="college"
-                  placeholder="Organization used in previous rounds"
+                  placeholder="Ex: Tech University"
                   required
                   value={formData.college}
                   onChange={(e) => setFormData({ ...formData, college: e.target.value })}
-                  className="pl-10 focus-visible:ring-primary"
+                  className="pl-10 focus-visible:ring-primary h-11"
                 />
               </div>
             </div>
@@ -129,8 +144,8 @@ export default function Home() {
               <div className="flex items-center justify-between">
                 <Label className="text-sm font-semibold">Select Challenge Level</Label>
                 {formData.level !== 'Basic' && (
-                  <Badge variant="outline" className="text-[10px] uppercase border-amber-500 text-amber-600 bg-amber-50 gap-1">
-                    <ShieldCheck className="w-3 h-3" /> Qualification Required
+                  <Badge variant="outline" className="text-[10px] uppercase border-amber-500 text-amber-600 bg-amber-50 gap-1 font-bold">
+                    <ShieldCheck className="w-3 h-3" /> Admin Auth Required
                   </Badge>
                 )}
               </div>
@@ -146,7 +161,7 @@ export default function Home() {
                   <div className="flex items-center gap-3">
                     <RadioGroupItem value="Basic" id="level-basic" />
                     <div>
-                      <div className="font-bold">Basic</div>
+                      <div className="font-bold">Basic Round</div>
                       <div className="text-xs text-muted-foreground">Open Admission • 15 Questions</div>
                     </div>
                   </div>
@@ -160,7 +175,7 @@ export default function Home() {
                     <RadioGroupItem value="Intermediate" id="level-intermediate" />
                     <div>
                       <div className="font-bold">Intermediate</div>
-                      <div className="text-xs text-muted-foreground">Admin Approval Required</div>
+                      <div className="text-xs text-muted-foreground">Requires Admin Promotion</div>
                     </div>
                   </div>
                   <Award className={`w-5 h-5 ${formData.level === 'Intermediate' ? 'text-primary' : 'text-muted-foreground'}`} />
@@ -172,8 +187,8 @@ export default function Home() {
                   <div className="flex items-center gap-3">
                     <RadioGroupItem value="Hard" id="level-hard" />
                     <div>
-                      <div className="font-bold">Hard</div>
-                      <div className="text-xs text-muted-foreground">Final Championship Round</div>
+                      <div className="font-bold">Championship (Hard)</div>
+                      <div className="text-xs text-muted-foreground">Final Stage • Invitation Only</div>
                     </div>
                   </div>
                   <Award className={`w-5 h-5 ${formData.level === 'Hard' ? 'text-primary' : 'text-muted-foreground'}`} />
@@ -186,12 +201,16 @@ export default function Home() {
               className="w-full bg-primary hover:bg-primary/90 text-white font-bold h-12 text-lg rounded-lg shadow-lg transition-transform active:scale-[0.98]"
               disabled={loading || !formData.name || !formData.college}
             >
-              {loading ? "Verifying..." : "Enter Challenge"}
+              {loading ? "Checking Status..." : "Enter Challenge"}
             </Button>
           </form>
         </CardContent>
-        <CardFooter className="justify-center border-t py-4">
-          <p className="text-xs text-muted-foreground font-medium">© 2024 TechQuiz Ascent.</p>
+        <CardFooter className="flex flex-col gap-4 border-t py-4 bg-secondary/10">
+          <div className="flex items-start gap-2 text-[10px] text-muted-foreground leading-tight">
+            <Info className="w-3 h-3 shrink-0 mt-0.5" />
+            <p>Ensure your name and college match exactly what you used in previous rounds. Contact organizers if you believe you were promoted but cannot enter.</p>
+          </div>
+          <p className="text-[10px] text-muted-foreground font-medium">© 2024 TechQuiz Ascent.</p>
         </CardFooter>
       </Card>
     </div>
