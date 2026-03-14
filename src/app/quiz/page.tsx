@@ -82,7 +82,7 @@ export default function QuizPage() {
     const timeTakenStr = `${Math.floor(timeSpentSeconds / 60)}m ${timeSpentSeconds % 60}s`;
 
     try {
-      // Step 1: Insert Participant Result
+      // Step 1: Insert Participant Result. We don't use .single() to avoid issues if read access is limited.
       const { data: pData, error: pError } = await supabase
         .from("participants")
         .insert({
@@ -95,18 +95,20 @@ export default function QuizPage() {
           submission_time: new Date().toISOString(),
           quiz_date: new Date().toISOString().split("T")[0],
         })
-        .select()
-        .single();
+        .select('id');
 
       if (pError) {
         console.error("Supabase participants error:", pError);
+        // We still allow them to finish if the core score is calculated, 
+        // but it's safer to alert them if the server didn't save it.
         throw new Error(pError.message);
       }
 
       // Step 2: Attempt to record detailed answers (Optional/Non-blocking)
-      if (pData?.id) {
+      const participantId = pData?.[0]?.id;
+      if (participantId) {
         await supabase.from("attempts").insert({
-          participant_id: pData.id,
+          participant_id: participantId,
           answers: JSON.stringify(actualAnswers),
           started_at: new Date(Date.now() - timeSpentSeconds * 1000).toISOString(),
           finished_at: new Date().toISOString(),
@@ -122,10 +124,12 @@ export default function QuizPage() {
       console.error("Submission catch error:", err);
       toast({ 
         title: "Submission Error", 
-        description: err.message || "There was a problem saving your results. Please try again or contact the administrator.", 
+        description: "Your results might not have saved correctly. Please try again or inform the host.", 
         variant: "destructive" 
       });
-      setStatus("ready");
+      // Fallback: show the finish screen anyway so the user sees their score, but warn them.
+      setScore(calculatedScore);
+      setStatus("finished");
     }
   }, [participant, questions, status]);
 
@@ -177,7 +181,7 @@ export default function QuizPage() {
     loadQuestions();
   }, [router]);
 
-  // Timer logic - stabilized by using a ref for submitQuiz dependencies
+  // Timer logic
   useEffect(() => {
     if (status !== "ready" || timeLeft === null) return;
 
@@ -234,7 +238,7 @@ export default function QuizPage() {
         <Card className="w-full max-w-lg text-center p-8 shadow-2xl">
           <CheckCircle2 className="w-20 h-20 text-green-500 mx-auto mb-4" />
           <CardTitle className="text-4xl font-headline font-extrabold text-foreground mb-2">Quiz Completed!</CardTitle>
-          <p className="text-muted-foreground mb-8 text-lg">Thank you, {participant?.name}. Your scores have been submitted successfully.</p>
+          <p className="text-muted-foreground mb-8 text-lg">Thank you, {participant?.name}. Your score has been calculated.</p>
           <div className="bg-primary/5 rounded-2xl p-8 mb-8 border-2 border-primary/10">
             <p className="text-sm font-bold text-primary uppercase tracking-widest mb-2">Your Final Score</p>
             <p className="text-7xl font-headline font-black text-primary">{score} <span className="text-3xl font-medium text-muted-foreground">/ {questions.length}</span></p>
