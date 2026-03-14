@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
@@ -25,18 +24,17 @@ import {
   LogOut, 
   Search, 
   ShieldAlert,
-  ArrowUpCircle,
   CheckCircle2,
-  XCircle,
   AlertTriangle,
   UserCog,
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
-  FileSpreadsheet
+  FileSpreadsheet,
+  ArrowUpCircle,
+  XCircle
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { format } from "date-fns";
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -685,8 +683,3 @@ export default function AdminDashboard() {
     </div>
   );
 }
-
-```
-
-### Credentials Note:
-To access the admin panel, use the credentials for any user you've created in the **Supabase Auth** section of your project. If you haven't created one yet, go to your Supabase project dashboard -> Authentication -> Users -> Add User. For example: `admin@example.com` and your chosen password.

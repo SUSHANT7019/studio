@@ -1,4 +1,3 @@
-
 'use server'
 
 import { revalidatePath } from "next/cache";
@@ -13,10 +12,9 @@ export async function getRounds() {
 
     if (error) throw error;
 
-    // Map snake_case from DB to camelCase for the UI
     const formattedData = data?.map((round: any) => ({
       id: round.id,
-      name: round.name || round.round_name, // Support both potential column names
+      name: round.name || round.round_name,
       startDate: new Date(round.start_date),
       endDate: new Date(round.end_date),
     })) || [];
@@ -57,3 +55,4 @@ export async function createRound(formData: FormData) {
     console.error("Failed to create round:", error);
     return { success: false, error: "Failed to create round" };
   }
+}
