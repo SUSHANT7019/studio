@@ -79,10 +79,9 @@ export default function QuizPage() {
 
     const currentTimeLeft = forceTime !== undefined ? forceTime : (timeLeftRef.current || 0);
     const timeSpentSeconds = getLevelTime(participant.level) - currentTimeLeft;
-    const timeTakenStr = `${Math.floor(timeSpentSeconds / 60)}m ${timeSpentSeconds % 60}s`;
 
     try {
-      // Step 1: Insert Participant Result. We don't use .single() to avoid issues if read access is limited.
+      // Step 1: Insert Participant Result. We send time_taken as seconds (integer)
       const { data: pData, error: pError } = await supabase
         .from("participants")
         .insert({
@@ -91,16 +90,14 @@ export default function QuizPage() {
           level: participant.level,
           score: calculatedScore,
           total_questions: questions.length,
-          time_taken: timeTakenStr,
+          time_taken: timeSpentSeconds, // Fixed: Send total seconds as integer
           submission_time: new Date().toISOString(),
           quiz_date: new Date().toISOString().split("T")[0],
         })
         .select('id');
 
       if (pError) {
-        console.error("Supabase participants error:", pError);
-        // We still allow them to finish if the core score is calculated, 
-        // but it's safer to alert them if the server didn't save it.
+        console.error("Supabase participants error:", pError.message, pError.details);
         throw new Error(pError.message);
       }
 
@@ -124,10 +121,10 @@ export default function QuizPage() {
       console.error("Submission catch error:", err);
       toast({ 
         title: "Submission Error", 
-        description: "Your results might not have saved correctly. Please try again or inform the host.", 
+        description: err.message || "Your results might not have saved correctly. Please inform the host.", 
         variant: "destructive" 
       });
-      // Fallback: show the finish screen anyway so the user sees their score, but warn them.
+      // Allow user to see results locally even if DB write fails, but warn them.
       setScore(calculatedScore);
       setStatus("finished");
     }

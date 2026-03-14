@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { LayoutDashboard, FileQuestion, Users, Trophy, Download, Plus, Trash2, Edit, LogOut, Filter } from "lucide-react";
+import { LayoutDashboard, FileQuestion, Users, Trophy, Download, Plus, Trash2, Edit, LogOut } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 export default function AdminDashboard() {
@@ -71,8 +71,15 @@ export default function AdminDashboard() {
     toast({ title: "Success", description: "Question saved." });
   };
 
+  const formatTimeTaken = (seconds: any) => {
+    if (typeof seconds !== 'number') return String(seconds || "0s");
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}m ${s}s`;
+  };
+
   const exportToCSV = () => {
-    const headers = ["Participant Name", "College Name", "Level", "Score", "Time Taken", "Submission Time"];
+    const headers = ["Participant Name", "College Name", "Level", "Score", "Time Taken (s)", "Submission Time"];
     const rows = results.map(r => [
       r.participant_name,
       r.college_name,
@@ -176,7 +183,7 @@ export default function AdminDashboard() {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-center font-bold text-lg text-primary">{r.score} / 15</TableCell>
-                        <TableCell>{r.time_taken}</TableCell>
+                        <TableCell>{formatTimeTaken(r.time_taken)}</TableCell>
                         <TableCell>{new Date(r.submission_time).toLocaleString()}</TableCell>
                       </TableRow>
                     ))}
