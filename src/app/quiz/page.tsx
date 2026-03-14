@@ -27,6 +27,19 @@ interface Participant {
   level: string;
 }
 
+/**
+ * Fisher-Yates Shuffle Algorithm
+ * Ensures a statistically unbiased random permutation of an array.
+ */
+function shuffleArray<T>(array: T[]): T[] {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+
 export default function QuizPage() {
   const router = useRouter();
   const [participant, setParticipant] = useState<Participant | null>(null);
@@ -41,7 +54,7 @@ export default function QuizPage() {
   const answersRef = useRef<Record<string, string>>({});
   const timeLeftRef = useRef<number | null>(null);
 
-  // Sync refs with state for use in callbacks without triggering re-renders or dependency changes
+  // Sync refs with state for use in callbacks
   useEffect(() => {
     answersRef.current = answers;
   }, [answers]);
@@ -80,7 +93,6 @@ export default function QuizPage() {
     const timeSpentSeconds = getLevelTime(participant.level) - currentTimeLeft;
 
     try {
-      // Step 1: Insert Participant Result
       const { data: pData, error: pError } = await supabase
         .from("participants")
         .insert({
@@ -95,12 +107,8 @@ export default function QuizPage() {
         })
         .select('id');
 
-      if (pError) {
-        console.error("Supabase participants error:", pError);
-        throw new Error(pError.message);
-      }
+      if (pError) throw new Error(pError.message);
 
-      // Step 2: Attempt to record detailed answers (Optional/Non-blocking)
       const participantId = pData?.[0]?.id;
       if (participantId) {
         try {
@@ -127,13 +135,11 @@ export default function QuizPage() {
         description: err.message || "Something went wrong saving your results.", 
         variant: "destructive" 
       });
-      // Fallback: still show final score to user even if DB write failed
       setScore(calculatedScore);
       setStatus("finished");
     }
   }, [participant, questions, status]);
 
-  // Initial load
   useEffect(() => {
     const raw = sessionStorage.getItem("quiz_participant");
     if (!raw) {
@@ -161,10 +167,6 @@ export default function QuizPage() {
         return;
       }
 
-      // Shuffling logic
-      const shuffled = [...data].sort(() => 0.5 - Math.random());
-      const selected = shuffled.slice(0, 15);
-      
       const savedState = localStorage.getItem(STATE_KEY(p));
       if (savedState) {
         const parsed = JSON.parse(savedState);
@@ -173,6 +175,9 @@ export default function QuizPage() {
         setTimeLeft(parsed.timeLeft);
         setCurrentIdx(parsed.currentIdx);
       } else {
+        // Randomly select 15 questions using Fisher-Yates shuffle
+        const shuffled = shuffleArray(data);
+        const selected = shuffled.slice(0, 15);
         setQuestions(selected);
         setTimeLeft(getLevelTime(p.level));
       }
@@ -182,7 +187,6 @@ export default function QuizPage() {
     loadQuestions();
   }, [router]);
 
-  // Timer logic
   useEffect(() => {
     if (status !== "ready" || timeLeft === null) return;
 
@@ -202,7 +206,6 @@ export default function QuizPage() {
     };
   }, [status, submitQuiz]);
 
-  // Persistence logic
   useEffect(() => {
     if (participant && questions.length > 0 && status === "ready") {
       localStorage.setItem(STATE_KEY(participant), JSON.stringify({
