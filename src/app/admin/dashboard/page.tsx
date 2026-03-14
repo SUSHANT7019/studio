@@ -31,7 +31,8 @@ import {
   ArrowDown,
   FileSpreadsheet,
   ArrowUpCircle,
-  XCircle
+  XCircle,
+  Filter
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
@@ -48,6 +49,9 @@ export default function AdminDashboard() {
   // Filter & Sort states
   const [filterLevel, setFilterLevel] = useState("All");
   const [searchName, setSearchName] = useState("");
+  const [scoreFilterValue, setScoreFilterValue] = useState<string>("");
+  const [scoreFilterOperator, setScoreFilterOperator] = useState<string>("greater");
+  
   const [sortConfig, setSortConfig] = useState<{ field: string; direction: 'asc' | 'desc' }>({
     field: 'submission_time',
     direction: 'desc'
@@ -197,11 +201,27 @@ export default function AdminDashboard() {
 
   const filteredResults = useMemo(() => {
     let filtered = results.filter(r => {
-      const matchesLevel = filterLevel === "All" || r.level === filterLevel;
+      // Name/College filter
       const matchesName = 
         (r.participant_name?.toLowerCase() || "").includes(searchName.toLowerCase()) || 
         (r.college_name?.toLowerCase() || "").includes(searchName.toLowerCase());
-      return matchesLevel && matchesName;
+      if (!matchesName) return false;
+
+      // Level filter
+      const matchesLevel = filterLevel === "All" || r.level === filterLevel;
+      if (!matchesLevel) return false;
+
+      // Score filter
+      if (scoreFilterValue !== "") {
+        const val = parseInt(scoreFilterValue, 10);
+        if (!isNaN(val)) {
+          if (scoreFilterOperator === "greater" && r.score < val) return false;
+          if (scoreFilterOperator === "less" && r.score > val) return false;
+          if (scoreFilterOperator === "equal" && r.score !== val) return false;
+        }
+      }
+
+      return true;
     });
 
     return filtered.sort((a, b) => {
@@ -214,7 +234,7 @@ export default function AdminDashboard() {
       
       return 0;
     });
-  }, [results, filterLevel, searchName, sortConfig]);
+  }, [results, filterLevel, searchName, scoreFilterValue, scoreFilterOperator, sortConfig]);
 
   const exportResultsToCSV = () => {
     const headers = ["Participant", "College", "Attempted Level", "Score", "Time (Seconds)", "Qualified For", "Date"];
@@ -466,23 +486,33 @@ export default function AdminDashboard() {
           <TabsContent value="results">
             <Card className="shadow-lg border-0">
               <CardHeader className="bg-white border-b py-6">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                  <div>
-                    <CardTitle className="text-2xl font-black">Participants Management</CardTitle>
-                    <CardDescription>Review performance, correct data, and promote participants.</CardDescription>
+                <div className="flex flex-col gap-6">
+                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div>
+                      <CardTitle className="text-2xl font-black">Participants Management</CardTitle>
+                      <CardDescription>Review performance, correct data, and promote participants.</CardDescription>
+                    </div>
                   </div>
-                  <div className="flex gap-3 w-full md:w-auto">
-                    <div className="relative flex-1 md:w-[300px]">
+                  
+                  {/* Filters Bar */}
+                  <div className="flex flex-wrap items-center gap-3 bg-secondary/20 p-4 rounded-xl border border-secondary">
+                    <div className="flex items-center gap-2 mr-2 text-muted-foreground">
+                      <Filter className="w-4 h-4" />
+                      <span className="text-xs font-bold uppercase">Filters</span>
+                    </div>
+
+                    <div className="relative w-full md:w-[250px]">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       <Input 
-                        placeholder="Search name or college..." 
-                        className="pl-10 h-10 w-full" 
+                        placeholder="Name or College..." 
+                        className="pl-10 h-10 w-full bg-white" 
                         value={searchName}
                         onChange={(e) => setSearchName(e.target.value)}
                       />
                     </div>
+
                     <Select value={filterLevel} onValueChange={setFilterLevel}>
-                      <SelectTrigger className="w-[140px] h-10"><SelectValue placeholder="All Levels" /></SelectTrigger>
+                      <SelectTrigger className="w-[140px] h-10 bg-white"><SelectValue placeholder="All Levels" /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="All">All Levels</SelectItem>
                         <SelectItem value="Basic">Basic</SelectItem>
@@ -490,6 +520,39 @@ export default function AdminDashboard() {
                         <SelectItem value="Hard">Hard</SelectItem>
                       </SelectContent>
                     </Select>
+
+                    <div className="flex items-center gap-2 ml-auto">
+                      <span className="text-xs font-bold text-muted-foreground whitespace-nowrap">Score:</span>
+                      <Select value={scoreFilterOperator} onValueChange={setScoreFilterOperator}>
+                        <SelectTrigger className="w-[130px] h-10 bg-white"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="greater">Greater/Equal</SelectItem>
+                          <SelectItem value="less">Less/Equal</SelectItem>
+                          <SelectItem value="equal">Exactly</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Input 
+                        type="number" 
+                        placeholder="Value" 
+                        className="w-20 h-10 bg-white"
+                        value={scoreFilterValue}
+                        onChange={(e) => setScoreFilterValue(e.target.value)}
+                      />
+                      {(searchName || filterLevel !== "All" || scoreFilterValue !== "") && (
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="text-xs text-primary"
+                          onClick={() => {
+                            setSearchName("");
+                            setFilterLevel("All");
+                            setScoreFilterValue("");
+                          }}
+                        >
+                          Clear All
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </CardHeader>
