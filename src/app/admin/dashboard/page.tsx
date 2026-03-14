@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { LayoutDashboard, FileQuestion, Users, Trophy, Download, Plus, Trash2, Edit, LogOut } from "lucide-react";
+import { LayoutDashboard, FileQuestion, Users, Trophy, Download, Plus, Trash2, Edit, LogOut, Search, Filter } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 export default function AdminDashboard() {
@@ -23,17 +23,24 @@ export default function AdminDashboard() {
   const [rounds, setRounds] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState<any>(null);
+  const [session, setSession] = useState<any>(null);
 
   // Filter states
   const [filterLevel, setFilterLevel] = useState("All");
   const [searchName, setSearchName] = useState("");
+  const [scoreFilter, setScoreFilter] = useState("All");
 
   useEffect(() => {
-    if (!sessionStorage.getItem("admin_auth")) {
-      router.push("/admin");
-      return;
-    }
-    fetchData();
+    const checkAuth = async () => {
+      const { data: { session: activeSession } } = await supabase.auth.getSession();
+      if (!activeSession) {
+        router.push("/admin");
+        return;
+      }
+      setSession(activeSession);
+      fetchData();
+    };
+    checkAuth();
   }, [router]);
 
   const fetchData = async () => {
@@ -48,11 +55,20 @@ export default function AdminDashboard() {
     setLoading(false);
   };
 
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    router.push("/admin");
+  };
+
   const handleDeleteQuestion = async (id: string) => {
-    if (!confirm("Delete this question?")) return;
-    await supabase.from("questions").delete().eq("id", id);
-    fetchData();
-    toast({ title: "Deleted", description: "Question removed successfully." });
+    if (!confirm("Delete this question permanently?")) return;
+    const { error } = await supabase.from("questions").delete().eq("id", id);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      fetchData();
+      toast({ title: "Deleted", description: "Question removed successfully." });
+    }
   };
 
   const handleSaveQuestion = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -60,29 +76,47 @@ export default function AdminDashboard() {
     const formData = new FormData(e.currentTarget);
     const data = Object.fromEntries(formData.entries());
     
-    if (isEditing) {
-      await supabase.from("questions").update(data).eq("id", isEditing.id);
+    if (isEditing?.id) {
+      const { error } = await supabase.from("questions").update(data).eq("id", isEditing.id);
+      if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
-      await supabase.from("questions").insert([data]);
+      const { error } = await supabase.from("questions").insert([data]);
+      if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
     }
     
     setIsEditing(null);
     fetchData();
-    toast({ title: "Success", description: "Question saved." });
+    toast({ title: "Success", description: "Question bank updated." });
   };
 
   const formatTimeTaken = (seconds: any) => {
-    if (typeof seconds !== 'number') return String(seconds || "0s");
+    if (typeof seconds !== 'number') return "N/A";
     const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
+    const s = Math.floor(seconds % 60);
     return `${m}m ${s}s`;
   };
 
+  const filteredResults = useMemo(() => {
+    return results.filter(r => {
+      const matchesLevel = filterLevel === "All" || r.level === filterLevel;
+      const matchesName = 
+        r.participant_name.toLowerCase().includes(searchName.toLowerCase()) || 
+        r.college_name.toLowerCase().includes(searchName.toLowerCase());
+      
+      let matchesScore = true;
+      if (scoreFilter === "High") matchesScore = r.score >= 12;
+      if (scoreFilter === "Medium") matchesScore = r.score >= 7 && r.score < 12;
+      if (scoreFilter === "Low") matchesScore = r.score < 7;
+
+      return matchesLevel && matchesName && matchesScore;
+    });
+  }, [results, filterLevel, searchName, scoreFilter]);
+
   const exportToCSV = () => {
     const headers = ["Participant Name", "College Name", "Level", "Score", "Time Taken (s)", "Submission Time"];
-    const rows = results.map(r => [
-      r.participant_name,
-      r.college_name,
+    const rows = filteredResults.map(r => [
+      `"${r.participant_name}"`,
+      `"${r.college_name}"`,
       r.level,
       r.score,
       r.time_taken,
@@ -95,103 +129,102 @@ export default function AdminDashboard() {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `results_export_${new Date().toISOString()}.csv`);
+    link.setAttribute("download", `techquiz_results_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
+    document.body.removeChild(link);
   };
 
-  const filteredResults = results.filter(r => {
-    const matchesLevel = filterLevel === "All" || r.level === filterLevel;
-    const matchesName = r.participant_name.toLowerCase().includes(searchName.toLowerCase()) || 
-                      r.college_name.toLowerCase().includes(searchName.toLowerCase());
-    return matchesLevel && matchesName;
-  });
+  if (!session) return null;
 
   return (
     <div className="min-h-screen bg-secondary/30 flex flex-col">
-      <header className="bg-primary text-white p-4 shadow-md flex justify-between items-center px-8">
-        <div className="flex items-center gap-2">
-          <LayoutDashboard className="w-6 h-6" />
-          <h1 className="text-xl font-headline font-bold">TechQuiz Ascent Admin</h1>
+      <header className="bg-white border-b sticky top-0 z-20 px-8 py-4 flex justify-between items-center shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
+            <ShieldAlert className="text-white w-6 h-6" />
+          </div>
+          <div>
+            <h1 className="text-xl font-headline font-bold text-foreground">TechQuiz Admin</h1>
+            <p className="text-xs text-muted-foreground font-medium">{session.user.email}</p>
+          </div>
         </div>
-        <Button variant="destructive" size="sm" onClick={() => { sessionStorage.removeItem("admin_auth"); router.push("/admin"); }} className="gap-2">
+        <Button variant="outline" size="sm" onClick={handleSignOut} className="gap-2 border-destructive text-destructive hover:bg-destructive hover:text-white transition-all">
           <LogOut className="w-4 h-4" /> Sign Out
         </Button>
       </header>
 
-      <main className="p-4 md:p-8 max-w-[1400px] mx-auto w-full">
-        <Tabs defaultValue="results" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 bg-white shadow-sm h-14 p-1">
-            <TabsTrigger value="results" className="gap-2 h-full"><Users className="w-4 h-4" /> Quiz Results</TabsTrigger>
-            <TabsTrigger value="questions" className="gap-2 h-full"><FileQuestion className="w-4 h-4" /> Manage Questions</TabsTrigger>
-            <TabsTrigger value="rounds" className="gap-2 h-full"><Trophy className="w-4 h-4" /> Rounds & Competition</TabsTrigger>
-            <TabsTrigger value="stats" className="gap-2 h-full"><LayoutDashboard className="w-4 h-4" /> Analytics</TabsTrigger>
-          </TabsList>
+      <main className="p-4 md:p-8 max-w-[1600px] mx-auto w-full">
+        <Tabs defaultValue="dashboard" className="space-y-6">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <TabsList className="bg-white shadow-sm h-12 p-1 border">
+              <TabsTrigger value="dashboard" className="gap-2"><LayoutDashboard className="w-4 h-4" /> Dashboard</TabsTrigger>
+              <TabsTrigger value="questions" className="gap-2"><FileQuestion className="w-4 h-4" /> Questions</TabsTrigger>
+              <TabsTrigger value="results" className="gap-2"><Users className="w-4 h-4" /> Results</TabsTrigger>
+              <TabsTrigger value="rounds" className="gap-2"><Trophy className="w-4 h-4" /> Rounds</TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="results">
-            <Card className="shadow-lg">
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle>Attempt Dashboard</CardTitle>
-                  <CardDescription>Monitor competition progress in real-time</CardDescription>
-                </div>
-                <div className="flex gap-4">
-                  <div className="flex items-center gap-2 bg-secondary p-1 rounded-md">
-                    <Select value={filterLevel} onValueChange={setFilterLevel}>
-                      <SelectTrigger className="w-[150px] bg-white border-0">
-                        <SelectValue placeholder="All Levels" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="All">All Levels</SelectItem>
-                        <SelectItem value="Basic">Basic</SelectItem>
-                        <SelectItem value="Intermediate">Intermediate</SelectItem>
-                        <SelectItem value="Hard">Hard</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <Input 
-                    placeholder="Search by name or college..." 
-                    className="w-[250px]" 
-                    value={searchName}
-                    onChange={(e) => setSearchName(e.target.value)}
-                  />
-                  <Button onClick={exportToCSV} className="gap-2 bg-green-600 hover:bg-green-700">
-                    <Download className="w-4 h-4" /> Export CSV
-                  </Button>
-                </div>
+            <div className="flex gap-2">
+               <Button onClick={exportToCSV} variant="outline" className="gap-2 bg-white">
+                 <Download className="w-4 h-4" /> Export Results
+               </Button>
+            </div>
+          </div>
+
+          <TabsContent value="dashboard">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+               <Card className="border-l-4 border-l-primary shadow-sm hover:shadow-md transition-shadow">
+                 <CardHeader className="pb-2">
+                   <CardDescription className="text-xs font-bold uppercase tracking-wider">Total Participants</CardDescription>
+                   <CardTitle className="text-4xl font-black">{results.length}</CardTitle>
+                 </CardHeader>
+               </Card>
+               <Card className="border-l-4 border-l-accent shadow-sm hover:shadow-md transition-shadow">
+                 <CardHeader className="pb-2">
+                   <CardDescription className="text-xs font-bold uppercase tracking-wider">Avg. Score</CardDescription>
+                   <CardTitle className="text-4xl font-black">
+                    {results.length > 0 ? (results.reduce((acc, r) => acc + r.score, 0) / results.length).toFixed(1) : 0}
+                   </CardTitle>
+                 </CardHeader>
+               </Card>
+               <Card className="border-l-4 border-l-green-500 shadow-sm hover:shadow-md transition-shadow">
+                 <CardHeader className="pb-2">
+                   <CardDescription className="text-xs font-bold uppercase tracking-wider">Bank Size</CardDescription>
+                   <CardTitle className="text-4xl font-black">{questions.length}</CardTitle>
+                 </CardHeader>
+               </Card>
+               <Card className="border-l-4 border-l-orange-500 shadow-sm hover:shadow-md transition-shadow">
+                 <CardHeader className="pb-2">
+                   <CardDescription className="text-xs font-bold uppercase tracking-wider">Hard Attempts</CardDescription>
+                   <CardTitle className="text-4xl font-black">{results.filter(r => r.level === 'Hard').length}</CardTitle>
+                 </CardHeader>
+               </Card>
+            </div>
+
+            <Card className="mt-8">
+              <CardHeader>
+                <CardTitle>Recent Activity</CardTitle>
+                <CardDescription>Latest participant submissions across all levels</CardDescription>
               </CardHeader>
               <CardContent>
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-secondary/50">
-                      <TableHead className="font-bold">Name</TableHead>
-                      <TableHead className="font-bold">College</TableHead>
-                      <TableHead className="font-bold">Level</TableHead>
-                      <TableHead className="font-bold text-center">Score</TableHead>
-                      <TableHead className="font-bold">Time Taken</TableHead>
-                      <TableHead className="font-bold">Submitted At</TableHead>
+                    <TableRow>
+                      <TableHead>Participant</TableHead>
+                      <TableHead>Level</TableHead>
+                      <TableHead>Score</TableHead>
+                      <TableHead>Time</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredResults.map((r) => (
+                    {results.slice(0, 5).map((r) => (
                       <TableRow key={r.id}>
                         <TableCell className="font-medium">{r.participant_name}</TableCell>
-                        <TableCell>{r.college_name}</TableCell>
-                        <TableCell>
-                          <Badge variant={r.level === 'Hard' ? 'destructive' : r.level === 'Intermediate' ? 'default' : 'secondary'}>
-                            {r.level}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-center font-bold text-lg text-primary">{r.score} / 15</TableCell>
-                        <TableCell>{formatTimeTaken(r.time_taken)}</TableCell>
-                        <TableCell>{new Date(r.submission_time).toLocaleString()}</TableCell>
+                        <TableCell><Badge variant="outline">{r.level}</Badge></TableCell>
+                        <TableCell className="font-bold text-primary">{r.score} / 15</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{new Date(r.submission_time).toLocaleTimeString()}</TableCell>
                       </TableRow>
                     ))}
-                    {filteredResults.length === 0 && (
-                      <TableRow>
-                        <TableCell colSpan={6} className="text-center h-24 text-muted-foreground">No attempts found matching filters.</TableCell>
-                      </TableRow>
-                    )}
                   </TableBody>
                 </Table>
               </CardContent>
@@ -199,27 +232,27 @@ export default function AdminDashboard() {
           </TabsContent>
 
           <TabsContent value="questions">
-            <Card className="shadow-lg">
+            <Card className="shadow-lg border-t-4 border-t-primary">
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
-                  <CardTitle>Question Bank</CardTitle>
-                  <CardDescription>Curate and manage your technical assessment</CardDescription>
+                  <CardTitle>Question Management</CardTitle>
+                  <CardDescription>Configure the technical question bank</CardDescription>
                 </div>
                 <Dialog open={isEditing !== null} onOpenChange={(open) => !open && setIsEditing(null)}>
                   <DialogTrigger asChild>
-                    <Button onClick={() => setIsEditing({})} className="gap-2">
-                      <Plus className="w-4 h-4" /> Add New Question
+                    <Button onClick={() => setIsEditing({})} className="gap-2 h-11 px-6">
+                      <Plus className="w-5 h-5" /> Add Question
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                     <form onSubmit={handleSaveQuestion} className="space-y-4">
                       <DialogHeader>
-                        <DialogTitle>{isEditing?.id ? "Edit Question" : "Add New Question"}</DialogTitle>
+                        <DialogTitle>{isEditing?.id ? "Edit Technical Question" : "New Technical Question"}</DialogTitle>
                       </DialogHeader>
                       <div className="grid grid-cols-1 gap-4 py-4">
                         <div className="space-y-2">
                           <label className="text-sm font-bold">Question Text</label>
-                          <Textarea name="question_text" defaultValue={isEditing?.question_text} required placeholder="Enter the technical question..." />
+                          <Textarea name="question_text" defaultValue={isEditing?.question_text} required placeholder="Enter the technical question logic..." className="min-h-[100px]" />
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                           <div className="space-y-2">
@@ -274,52 +307,128 @@ export default function AdminDashboard() {
                 </Dialog>
               </CardHeader>
               <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-secondary/50">
-                      <TableHead className="w-[400px]">Question</TableHead>
-                      <TableHead>Options (A/B/C/D)</TableHead>
-                      <TableHead>Answer</TableHead>
-                      <TableHead>Level</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {questions.map((q) => (
-                      <TableRow key={q.id}>
-                        <TableCell className="font-medium line-clamp-2 max-w-[400px]">{q.question_text}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground">
-                          {q.option_a} | {q.option_b} | {q.option_c} | {q.option_d}
-                        </TableCell>
-                        <TableCell className="font-bold text-accent">{q.correct_answer}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{q.difficulty_level}</Badge>
-                        </TableCell>
-                        <TableCell className="text-right flex justify-end gap-2">
-                          <Button size="icon" variant="ghost" onClick={() => setIsEditing(q)}><Edit className="w-4 h-4" /></Button>
-                          <Button size="icon" variant="ghost" className="text-destructive hover:bg-destructive/10" onClick={() => handleDeleteQuestion(q.id)}><Trash2 className="w-4 h-4" /></Button>
-                        </TableCell>
+                <div className="border rounded-lg overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-secondary/50">
+                        <TableHead className="w-[450px]">Question</TableHead>
+                        <TableHead>Correct</TableHead>
+                        <TableHead>Level</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {questions.map((q) => (
+                        <TableRow key={q.id}>
+                          <TableCell className="font-medium">
+                            <p className="line-clamp-2">{q.question_text}</p>
+                          </TableCell>
+                          <TableCell><Badge className="bg-green-100 text-green-800 hover:bg-green-100 border-green-200">{q.correct_answer}</Badge></TableCell>
+                          <TableCell><Badge variant="secondary">{q.difficulty_level}</Badge></TableCell>
+                          <TableCell className="text-right flex justify-end gap-1">
+                            <Button size="icon" variant="ghost" onClick={() => setIsEditing(q)}><Edit className="w-4 h-4" /></Button>
+                            <Button size="icon" variant="ghost" className="text-destructive hover:bg-destructive/10" onClick={() => handleDeleteQuestion(q.id)}><Trash2 className="w-4 h-4" /></Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="results">
+            <Card className="shadow-lg">
+              <CardHeader>
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                  <div>
+                    <CardTitle>Competition Results</CardTitle>
+                    <CardDescription>Real-time participant leaderboard and metrics</CardDescription>
+                  </div>
+                  <div className="flex flex-wrap gap-3">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input 
+                        placeholder="Search name/college..." 
+                        className="pl-10 w-[240px]" 
+                        value={searchName}
+                        onChange={(e) => setSearchName(e.target.value)}
+                      />
+                    </div>
+                    <Select value={filterLevel} onValueChange={setFilterLevel}>
+                      <SelectTrigger className="w-[140px] bg-white"><SelectValue placeholder="Level" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="All">All Levels</SelectItem>
+                        <SelectItem value="Basic">Basic</SelectItem>
+                        <SelectItem value="Intermediate">Intermediate</SelectItem>
+                        <SelectItem value="Hard">Hard</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Select value={scoreFilter} onValueChange={setScoreFilter}>
+                      <SelectTrigger className="w-[140px] bg-white"><SelectValue placeholder="Score" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="All">All Scores</SelectItem>
+                        <SelectItem value="High">12+ (High)</SelectItem>
+                        <SelectItem value="Medium">7-11 (Medium)</SelectItem>
+                        <SelectItem value="Low">{"< 7"} (Low)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="border rounded-lg">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-secondary/50">
+                        <TableHead>Participant</TableHead>
+                        <TableHead>College</TableHead>
+                        <TableHead>Level</TableHead>
+                        <TableHead className="text-center">Score</TableHead>
+                        <TableHead>Time Taken</TableHead>
+                        <TableHead>Submission</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredResults.map((r) => (
+                        <TableRow key={r.id} className="hover:bg-primary/5 transition-colors">
+                          <TableCell className="font-bold">{r.participant_name}</TableCell>
+                          <TableCell className="text-muted-foreground">{r.college_name}</TableCell>
+                          <TableCell><Badge variant="outline">{r.level}</Badge></TableCell>
+                          <TableCell className="text-center font-black text-primary text-lg">{r.score}</TableCell>
+                          <TableCell>{formatTimeTaken(r.time_taken)}</TableCell>
+                          <TableCell className="text-xs">{new Date(r.submission_time).toLocaleString()}</TableCell>
+                        </TableRow>
+                      ))}
+                      {filteredResults.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
+                            <div className="flex flex-col items-center gap-2">
+                              <Filter className="w-8 h-8 opacity-20" />
+                              <p>No records found matching your current filters.</p>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
 
           <TabsContent value="rounds">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Card className="col-span-1 shadow-md">
-                <CardHeader>
-                  <CardTitle>Create Round</CardTitle>
-                </CardHeader>
+              <Card className="col-span-1 shadow-md border-t-4 border-t-accent">
+                <CardHeader><CardTitle>Initialize Round</CardTitle></CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
                     <label className="text-sm font-bold">Round Name</label>
-                    <Input placeholder="e.g. Semi-Finals" />
+                    <Input placeholder="e.g. Finals 2024" />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-bold">Base Level</label>
+                    <label className="text-sm font-bold">Target Level</label>
                     <Select defaultValue="Hard">
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
@@ -329,61 +438,38 @@ export default function AdminDashboard() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <Button className="w-full bg-accent">Initialize Round</Button>
+                  <Button className="w-full bg-accent hover:bg-accent/90">Create Competition Phase</Button>
                 </CardContent>
               </Card>
 
               <Card className="col-span-2 shadow-md">
-                <CardHeader>
-                  <CardTitle>Competition Hierarchy</CardTitle>
-                </CardHeader>
+                <CardHeader><CardTitle>Active Competition Phases</CardTitle></CardHeader>
                 <CardContent>
-                  <div className="flex flex-col gap-4">
+                  <div className="space-y-4">
                     {rounds.map((round) => (
-                      <div key={round.id} className="p-4 border rounded-lg flex justify-between items-center bg-white shadow-sm">
-                        <div>
-                          <h4 className="font-bold text-lg">{round.round_name}</h4>
-                          <p className="text-sm text-muted-foreground">Level: {round.level}</p>
+                      <div key={round.id} className="p-5 border rounded-xl flex justify-between items-center bg-white hover:border-primary/50 transition-colors shadow-sm">
+                        <div className="flex items-center gap-4">
+                          <div className="p-3 bg-primary/10 rounded-full"><Trophy className="text-primary w-5 h-5" /></div>
+                          <div>
+                            <h4 className="font-bold text-lg">{round.round_name}</h4>
+                            <p className="text-sm text-muted-foreground">Difficulty: {round.level}</p>
+                          </div>
                         </div>
                         <div className="flex gap-2">
-                          <Button variant="outline" size="sm">Manage Participants</Button>
-                          <Button size="sm">End Round</Button>
+                          <Button variant="outline" size="sm">Analytics</Button>
+                          <Button size="sm" variant="destructive">End Phase</Button>
                         </div>
                       </div>
                     ))}
                     {rounds.length === 0 && (
-                      <p className="text-center py-8 text-muted-foreground">No active rounds created yet.</p>
+                      <div className="text-center py-12 border-2 border-dashed rounded-xl text-muted-foreground bg-secondary/20">
+                        <Trophy className="w-12 h-12 mx-auto mb-3 opacity-20" />
+                        <p className="font-medium">No competition rounds are currently active.</p>
+                      </div>
                     )}
                   </div>
                 </CardContent>
               </Card>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="stats">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-               <Card className="p-6 flex flex-col items-center justify-center bg-primary text-white shadow-xl">
-                 <h4 className="text-sm font-bold opacity-80 uppercase">Total Participants</h4>
-                 <p className="text-5xl font-headline font-black mt-2">{results.length}</p>
-               </Card>
-               <Card className="p-6 flex flex-col items-center justify-center bg-accent text-white shadow-xl">
-                 <h4 className="text-sm font-bold opacity-80 uppercase">Average Score</h4>
-                 <p className="text-5xl font-headline font-black mt-2">
-                  {results.length > 0 ? (results.reduce((acc, r) => acc + r.score, 0) / results.length).toFixed(1) : 0}
-                 </p>
-               </Card>
-               <Card className="p-6 flex flex-col items-center justify-center bg-white border shadow-xl">
-                 <h4 className="text-sm font-bold text-muted-foreground uppercase">Top Performance</h4>
-                 <p className="text-5xl font-headline font-black text-foreground mt-2">
-                  {results.length > 0 ? Math.max(...results.map(r => r.score)) : 0}
-                 </p>
-               </Card>
-               <Card className="p-6 flex flex-col items-center justify-center bg-white border shadow-xl">
-                 <h4 className="text-sm font-bold text-muted-foreground uppercase">Hard Attempts</h4>
-                 <p className="text-5xl font-headline font-black text-foreground mt-2">
-                  {results.filter(r => r.level === 'Hard').length}
-                 </p>
-               </Card>
             </div>
           </TabsContent>
         </Tabs>
