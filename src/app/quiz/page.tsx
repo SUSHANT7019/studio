@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Timer, ChevronLeft, ChevronRight, CheckCircle2, ListChecks } from "lucide-react";
@@ -150,13 +150,27 @@ export default function QuizPage() {
     const p = JSON.parse(raw);
     setParticipant(p);
 
-    if (localStorage.getItem(SUBMISSION_KEY(p))) {
-      toast({ title: "Already Attempted", description: "Results for this level are already recorded." });
-      router.push("/");
-      return;
-    }
+    const loadQuestionsAndCheckStatus = async () => {
+      // 1. Check Database for existing submission (Source of Truth)
+      const { data: existing, error: checkError } = await supabase
+        .from("participants")
+        .select("id")
+        .eq("participant_name", p.name)
+        .eq("college_name", p.college)
+        .eq("level", p.level)
+        .limit(1);
 
-    const loadQuestions = async () => {
+      if (existing && existing.length > 0) {
+        localStorage.setItem(SUBMISSION_KEY(p), "true");
+        toast({ title: "Already Attempted", description: "Results for this level are already recorded." });
+        router.push("/");
+        return;
+      } else {
+        // Clear stale local storage if database record was deleted
+        localStorage.removeItem(SUBMISSION_KEY(p));
+      }
+
+      // 2. Load questions
       const { data, error } = await supabase
         .from("questions")
         .select("*")
@@ -176,7 +190,7 @@ export default function QuizPage() {
         setTimeLeft(parsed.timeLeft);
         setCurrentIdx(parsed.currentIdx);
       } else {
-        // Randomly select 15 questions using Fisher-Yates shuffle
+        // Randomly select 15 questions
         const shuffled = shuffleArray(data);
         const selected = shuffled.slice(0, 15);
         setQuestions(selected);
@@ -185,7 +199,7 @@ export default function QuizPage() {
       setStatus("ready");
     };
 
-    loadQuestions();
+    loadQuestionsAndCheckStatus();
   }, [router]);
 
   useEffect(() => {
