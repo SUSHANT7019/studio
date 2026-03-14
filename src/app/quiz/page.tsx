@@ -8,7 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { Timer, ChevronLeft, ChevronRight, CheckCircle2, ListChecks } from "lucide-react";
+import { Timer, ChevronLeft, ChevronRight, CheckCircle2, ListChecks, Info } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
@@ -89,7 +89,7 @@ export default function QuizPage() {
     const timeSpentSeconds = getLevelTime(participant.level) - currentTimeLeft;
 
     try {
-      const { data: pData, error: pError } = await supabase
+      const { error: pError } = await supabase
         .from("participants")
         .insert({
           participant_name: participant.name,
@@ -100,8 +100,7 @@ export default function QuizPage() {
           time_taken: Math.max(0, Math.floor(timeSpentSeconds)),
           submission_time: new Date().toISOString(),
           quiz_date: new Date().toISOString().split("T")[0],
-        })
-        .select('id');
+        });
 
       if (pError) throw new Error(pError.message);
 
