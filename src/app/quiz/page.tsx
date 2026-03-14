@@ -5,11 +5,12 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { Timer, ChevronLeft, ChevronRight, CheckCircle2 } from "lucide-react";
+import { Timer, ChevronLeft, ChevronRight, CheckCircle2, ListChecks } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 interface Question {
   id: string;
@@ -285,6 +286,50 @@ export default function QuizPage() {
       </header>
 
       <main className="flex-1 flex flex-col p-4 md:p-8 max-w-4xl mx-auto w-full gap-6">
+        {/* Question Navigator */}
+        <Card className="border-0 shadow-sm overflow-hidden">
+          <CardHeader className="bg-secondary/20 py-3 flex flex-row items-center gap-2">
+            <ListChecks className="w-4 h-4 text-primary" />
+            <span className="text-sm font-bold text-primary uppercase tracking-tight">Question Navigator</span>
+          </CardHeader>
+          <CardContent className="p-4">
+            <div className="flex flex-wrap gap-2">
+              {questions.map((ques, idx) => {
+                const isAnswered = !!answers[ques.id];
+                const isCurrent = idx === currentIdx;
+                return (
+                  <button
+                    key={idx}
+                    onClick={() => setCurrentIdx(idx)}
+                    className={cn(
+                      "w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold transition-all border-2",
+                      isCurrent ? "border-primary bg-primary text-white scale-110 z-10" :
+                      isAnswered ? "border-green-500 bg-green-50 text-green-700" :
+                      "border-muted bg-muted/20 text-muted-foreground hover:border-primary/40"
+                    )}
+                  >
+                    {idx + 1}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-4 flex gap-4 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded bg-primary"></div>
+                <span>Current</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded bg-green-500"></div>
+                <span>Answered</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded bg-muted"></div>
+                <span>Unattempted</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         <div className="space-y-2">
           <div className="flex justify-between text-sm font-semibold text-muted-foreground">
             <span>Question {currentIdx + 1} of {questions.length}</span>
@@ -293,7 +338,7 @@ export default function QuizPage() {
           <Progress value={progress} className="h-2 bg-secondary" />
         </div>
 
-        <Card className="flex-1 shadow-lg border-0 bg-white">
+        <Card className="flex-1 shadow-lg border-0 bg-white mb-8">
           <CardHeader>
             <CardTitle className="text-2xl font-headline leading-relaxed text-foreground">
               {q.question_text}
@@ -336,16 +381,7 @@ export default function QuizPage() {
             >
               <ChevronLeft className="w-4 h-4" /> Previous
             </Button>
-            <div className="flex gap-2">
-              {questions.map((_, i) => (
-                <button
-                  key={i}
-                  onClick={() => setCurrentIdx(i)}
-                  className={`w-3 h-3 rounded-full transition-all ${i === currentIdx ? 'bg-primary scale-125' : answers[questions[i].id] ? 'bg-green-400' : 'bg-secondary'}`}
-                  aria-label={`Go to question ${i + 1}`}
-                />
-              ))}
-            </div>
+            
             <Button 
               onClick={() => {
                 if (currentIdx === questions.length - 1) {
