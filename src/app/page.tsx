@@ -27,11 +27,12 @@ export default function Home() {
 
     // To attempt Intermediate or Hard, an admin must have set 'qualified_for' 
     // for this Name + College pair in any of their previous submissions.
+    // Using .ilike for case-insensitive matching.
     const { data, error } = await supabase
       .from("participants")
       .select("qualified_for")
-      .eq("participant_name", formData.name.trim())
-      .eq("college_name", formData.college.trim())
+      .ilike("participant_name", formData.name.trim())
+      .ilike("college_name", formData.college.trim())
       .eq("qualified_for", formData.level);
 
     if (error) {
