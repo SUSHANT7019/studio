@@ -9,7 +9,7 @@ import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { Timer, ChevronLeft, ChevronRight, CheckCircle2, AlertCircle } from "lucide-react";
+import { Timer, ChevronLeft, ChevronRight, CheckCircle2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 interface Question {
@@ -37,7 +37,19 @@ export default function QuizPage() {
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "submitting" | "finished">("loading");
   const [score, setScore] = useState(0);
+  
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const answersRef = useRef<Record<string, string>>({});
+  const timeLeftRef = useRef<number | null>(null);
+
+  // Sync refs with state for use in callbacks without triggering re-renders or dependency changes
+  useEffect(() => {
+    answersRef.current = answers;
+  }, [answers]);
+
+  useEffect(() => {
+    timeLeftRef.current = timeLeft;
+  }, [timeLeft]);
 
   const SUBMISSION_KEY = (p: Participant) => `quiz_submitted_${p.name}_${p.level}`;
   const STATE_KEY = (p: Participant) => `quiz_state_${p.name}_${p.level}`;
@@ -52,11 +64,12 @@ export default function QuizPage() {
   };
 
   const submitQuiz = useCallback(async (finalAnswers?: Record<string, string>, forceTime?: number) => {
-    if (!participant || status === "finished") return;
+    if (!participant || status === "finished" || status === "submitting") return;
+    
     setStatus("submitting");
     if (timerRef.current) clearInterval(timerRef.current);
 
-    const actualAnswers = finalAnswers || answers;
+    const actualAnswers = finalAnswers || answersRef.current;
     let calculatedScore = 0;
     questions.forEach((q) => {
       if (actualAnswers[q.id] === q.correct_answer) {
@@ -64,10 +77,12 @@ export default function QuizPage() {
       }
     });
 
-    const timeSpentSeconds = getLevelTime(participant.level) - (forceTime !== undefined ? forceTime : (timeLeft || 0));
+    const currentTimeLeft = forceTime !== undefined ? forceTime : (timeLeftRef.current || 0);
+    const timeSpentSeconds = getLevelTime(participant.level) - currentTimeLeft;
     const timeTakenStr = `${Math.floor(timeSpentSeconds / 60)}m ${timeSpentSeconds % 60}s`;
 
     try {
+      // Step 1: Insert Participant Result
       const { data: pData, error: pError } = await supabase
         .from("participants")
         .insert({
@@ -83,14 +98,20 @@ export default function QuizPage() {
         .select()
         .single();
 
-      if (pError) throw pError;
+      if (pError) {
+        console.error("Supabase participants error:", pError);
+        throw new Error(pError.message);
+      }
 
-      await supabase.from("attempts").insert({
-        participant_id: pData.id,
-        answers: JSON.stringify(actualAnswers),
-        started_at: new Date(Date.now() - timeSpentSeconds * 1000).toISOString(),
-        finished_at: new Date().toISOString(),
-      });
+      // Step 2: Attempt to record detailed answers (Optional/Non-blocking)
+      if (pData?.id) {
+        await supabase.from("attempts").insert({
+          participant_id: pData.id,
+          answers: JSON.stringify(actualAnswers),
+          started_at: new Date(Date.now() - timeSpentSeconds * 1000).toISOString(),
+          finished_at: new Date().toISOString(),
+        }).catch(err => console.warn("Failed to save detailed attempts:", err));
+      }
 
       setScore(calculatedScore);
       setStatus("finished");
@@ -98,11 +119,15 @@ export default function QuizPage() {
       localStorage.removeItem(STATE_KEY(participant));
       
     } catch (err: any) {
-      console.error(err);
-      toast({ title: "Submission Error", description: "There was a problem saving your results. Please contact the administrator.", variant: "destructive" });
+      console.error("Submission catch error:", err);
+      toast({ 
+        title: "Submission Error", 
+        description: err.message || "There was a problem saving your results. Please try again or contact the administrator.", 
+        variant: "destructive" 
+      });
       setStatus("ready");
     }
-  }, [participant, questions, answers, timeLeft, status]);
+  }, [participant, questions, status]);
 
   // Initial load
   useEffect(() => {
@@ -126,12 +151,13 @@ export default function QuizPage() {
         .select("*")
         .eq("difficulty_level", p.level);
 
-      if (error || !data) {
-        toast({ title: "Error", description: "Failed to load questions.", variant: "destructive" });
+      if (error || !data || data.length === 0) {
+        toast({ title: "Error", description: "Failed to load questions for this level.", variant: "destructive" });
+        router.push("/");
         return;
       }
 
-      const shuffled = data.sort(() => 0.5 - Math.random());
+      const shuffled = [...data].sort(() => 0.5 - Math.random());
       const selected = shuffled.slice(0, 15);
       
       const savedState = localStorage.getItem(STATE_KEY(p));
@@ -151,7 +177,7 @@ export default function QuizPage() {
     loadQuestions();
   }, [router]);
 
-  // Timer logic
+  // Timer logic - stabilized by using a ref for submitQuiz dependencies
   useEffect(() => {
     if (status !== "ready" || timeLeft === null) return;
 
@@ -159,7 +185,7 @@ export default function QuizPage() {
       setTimeLeft((prev) => {
         if (prev === null) return null;
         if (prev <= 1) {
-          submitQuiz(answers, 0);
+          submitQuiz(undefined, 0);
           return 0;
         }
         return prev - 1;
@@ -169,7 +195,7 @@ export default function QuizPage() {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [status, submitQuiz, answers]);
+  }, [status, submitQuiz]);
 
   // Persistence logic
   useEffect(() => {
@@ -220,11 +246,12 @@ export default function QuizPage() {
   }
 
   const q = questions[currentIdx];
-  const progress = ((currentIdx + 1) / questions.length) * 100;
+  const progress = questions.length > 0 ? ((currentIdx + 1) / questions.length) * 100 : 0;
+
+  if (!q) return null;
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* Header */}
       <header className="bg-white border-b sticky top-0 z-10 px-6 py-4 shadow-sm flex items-center justify-between">
         <div className="flex flex-col">
           <h1 className="text-xl font-headline font-bold text-primary">TechQuiz Ascent</h1>
