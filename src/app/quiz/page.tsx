@@ -81,7 +81,7 @@ export default function QuizPage() {
     const timeSpentSeconds = getLevelTime(participant.level) - currentTimeLeft;
 
     try {
-      // Step 1: Insert Participant Result. We send time_taken as seconds (integer)
+      // Step 1: Insert Participant Result
       const { data: pData, error: pError } = await supabase
         .from("participants")
         .insert({
@@ -90,26 +90,30 @@ export default function QuizPage() {
           level: participant.level,
           score: calculatedScore,
           total_questions: questions.length,
-          time_taken: timeSpentSeconds, // Fixed: Send total seconds as integer
+          time_taken: Math.floor(timeSpentSeconds), // Must be an integer
           submission_time: new Date().toISOString(),
           quiz_date: new Date().toISOString().split("T")[0],
         })
         .select('id');
 
       if (pError) {
-        console.error("Supabase participants error:", pError.message, pError.details);
+        console.error("Supabase error submitting participant:", pError.message, pError.details);
         throw new Error(pError.message);
       }
 
       // Step 2: Attempt to record detailed answers (Optional/Non-blocking)
       const participantId = pData?.[0]?.id;
       if (participantId) {
-        await supabase.from("attempts").insert({
-          participant_id: participantId,
-          answers: JSON.stringify(actualAnswers),
-          started_at: new Date(Date.now() - timeSpentSeconds * 1000).toISOString(),
-          finished_at: new Date().toISOString(),
-        }).catch(err => console.warn("Failed to save detailed attempts:", err));
+        try {
+          await supabase.from("attempts").insert({
+            participant_id: participantId,
+            answers: JSON.stringify(actualAnswers),
+            started_at: new Date(Date.now() - timeSpentSeconds * 1000).toISOString(),
+            finished_at: new Date().toISOString(),
+          });
+        } catch (attemptErr) {
+          console.warn("Failed to save detailed attempts:", attemptErr);
+        }
       }
 
       setScore(calculatedScore);
@@ -118,13 +122,13 @@ export default function QuizPage() {
       localStorage.removeItem(STATE_KEY(participant));
       
     } catch (err: any) {
-      console.error("Submission catch error:", err);
+      console.error("Critical submission error:", err);
       toast({ 
         title: "Submission Error", 
-        description: err.message || "Your results might not have saved correctly. Please inform the host.", 
+        description: err.message || "Something went wrong saving your results.", 
         variant: "destructive" 
       });
-      // Allow user to see results locally even if DB write fails, but warn them.
+      // Fallback: still show final score to user even if DB write failed
       setScore(calculatedScore);
       setStatus("finished");
     }
@@ -141,7 +145,7 @@ export default function QuizPage() {
     setParticipant(p);
 
     if (localStorage.getItem(SUBMISSION_KEY(p))) {
-      toast({ title: "Duplicate Attempt", description: "You have already completed this quiz level." });
+      toast({ title: "Already Attempted", description: "Results for this level are already recorded." });
       router.push("/");
       return;
     }
@@ -153,7 +157,7 @@ export default function QuizPage() {
         .eq("difficulty_level", p.level);
 
       if (error || !data || data.length === 0) {
-        toast({ title: "Error", description: "Failed to load questions for this level.", variant: "destructive" });
+        toast({ title: "Error", description: "Questions not found for this level.", variant: "destructive" });
         router.push("/");
         return;
       }
@@ -224,7 +228,7 @@ export default function QuizPage() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-background">
         <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-        <p className="font-headline font-semibold text-primary">Preparing your Technical Challenge...</p>
+        <p className="font-headline font-semibold text-primary">Setting up the quiz...</p>
       </div>
     );
   }
@@ -234,13 +238,13 @@ export default function QuizPage() {
       <div className="min-h-screen flex items-center justify-center p-4 bg-background">
         <Card className="w-full max-w-lg text-center p-8 shadow-2xl">
           <CheckCircle2 className="w-20 h-20 text-green-500 mx-auto mb-4" />
-          <CardTitle className="text-4xl font-headline font-extrabold text-foreground mb-2">Quiz Completed!</CardTitle>
-          <p className="text-muted-foreground mb-8 text-lg">Thank you, {participant?.name}. Your score has been calculated.</p>
+          <CardTitle className="text-4xl font-headline font-extrabold text-foreground mb-2">Quiz Finished!</CardTitle>
+          <p className="text-muted-foreground mb-8 text-lg">Thank you, {participant?.name}. Your results have been submitted.</p>
           <div className="bg-primary/5 rounded-2xl p-8 mb-8 border-2 border-primary/10">
-            <p className="text-sm font-bold text-primary uppercase tracking-widest mb-2">Your Final Score</p>
+            <p className="text-sm font-bold text-primary uppercase tracking-widest mb-2">Your Result</p>
             <p className="text-7xl font-headline font-black text-primary">{score} <span className="text-3xl font-medium text-muted-foreground">/ {questions.length}</span></p>
           </div>
-          <Button onClick={() => router.push("/")} className="w-full h-12 font-bold text-lg">Back to Home</Button>
+          <Button onClick={() => router.push("/")} className="w-full h-12 font-bold text-lg">Return to Landing</Button>
         </Card>
       </div>
     );
@@ -267,12 +271,12 @@ export default function QuizPage() {
           <Button 
             variant="default" 
             onClick={() => {
-              if (confirm("Are you sure you want to submit your quiz?")) submitQuiz();
+              if (confirm("Submit your answers now?")) submitQuiz();
             }}
             disabled={status === "submitting"}
             className="font-bold bg-accent hover:bg-accent/90 text-white"
           >
-            Submit Quiz
+            Submit
           </Button>
         </div>
       </header>
@@ -281,7 +285,7 @@ export default function QuizPage() {
         <div className="space-y-2">
           <div className="flex justify-between text-sm font-semibold text-muted-foreground">
             <span>Question {currentIdx + 1} of {questions.length}</span>
-            <span>{Math.round(progress)}% Complete</span>
+            <span>{Math.round(progress)}% Progress</span>
           </div>
           <Progress value={progress} className="h-2 bg-secondary" />
         </div>
@@ -342,14 +346,14 @@ export default function QuizPage() {
             <Button 
               onClick={() => {
                 if (currentIdx === questions.length - 1) {
-                  if (confirm("Final question reached. Do you want to submit?")) submitQuiz();
+                  if (confirm("This is the last question. Submit now?")) submitQuiz();
                 } else {
                   setCurrentIdx(Math.min(questions.length - 1, currentIdx + 1));
                 }
               }}
               className="gap-2 h-12 px-6 font-bold bg-primary"
             >
-              {currentIdx === questions.length - 1 ? "Submit Results" : "Next"} <ChevronRight className="w-4 h-4" />
+              {currentIdx === questions.length - 1 ? "Submit Quiz" : "Next"} <ChevronRight className="w-4 h-4" />
             </Button>
           </CardFooter>
         </Card>
@@ -359,8 +363,8 @@ export default function QuizPage() {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
           <div className="bg-white p-8 rounded-2xl shadow-2xl flex flex-col items-center gap-4 max-w-sm text-center">
             <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-            <h3 className="text-xl font-bold text-foreground">Submitting Your Quiz...</h3>
-            <p className="text-sm text-muted-foreground font-medium">Please do not close this window while we securely store your results.</p>
+            <h3 className="text-xl font-bold text-foreground">Finalizing Submission...</h3>
+            <p className="text-sm text-muted-foreground font-medium">Please wait while your results are secured.</p>
           </div>
         </div>
       )}
