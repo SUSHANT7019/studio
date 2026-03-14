@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
-import { GraduationCap, Award, BrainCircuit, AlertCircle, ShieldCheck } from "lucide-react";
+import { GraduationCap, Award, BrainCircuit, ShieldCheck } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 export default function Home() {
@@ -25,21 +25,25 @@ export default function Home() {
     // Basic level is open to everyone
     if (formData.level === "Basic") return true;
 
+    const trimmedName = formData.name.trim();
+    const trimmedCollege = formData.college.trim();
+
     // To attempt Intermediate or Hard, an admin must have set 'qualified_for' 
     // for this Name + College pair in any of their previous submissions.
-    // Using .ilike for case-insensitive matching.
+    // We use .ilike for case-insensitive matching.
     const { data, error } = await supabase
       .from("participants")
       .select("qualified_for")
-      .ilike("participant_name", formData.name.trim())
-      .ilike("college_name", formData.college.trim())
+      .ilike("participant_name", trimmedName)
+      .ilike("college_name", trimmedCollege)
       .eq("qualified_for", formData.level);
 
     if (error) {
-      console.error("Eligibility check error:", error);
+      console.error("Eligibility Check Error:", error.message);
       return false;
     }
 
+    // If any record exists for this person that has the target level in 'qualified_for'
     return data && data.length > 0;
   };
 
@@ -55,7 +59,7 @@ export default function Home() {
       if (!isEligible) {
         toast({
           title: "Access Restricted",
-          description: `You are not yet qualified for the ${formData.level} level. Please complete the previous rounds or wait for admin approval.`,
+          description: `You are not yet qualified for the ${formData.level} level. Please ensure your name/college matches exactly what you used in the previous round.`,
           variant: "destructive",
         });
         setLoading(false);
@@ -74,7 +78,7 @@ export default function Home() {
       console.error("Submission error:", err);
       toast({
         title: "Connection Error",
-        description: "Verify your internet connection and try again.",
+        description: "Could not verify eligibility. Please try again.",
         variant: "destructive",
       });
       setLoading(false);
@@ -99,7 +103,7 @@ export default function Home() {
               <Label htmlFor="name" className="text-sm font-semibold">Full Name</Label>
               <Input
                 id="name"
-                placeholder="Enter your name exactly as registered"
+                placeholder="Name used in previous rounds"
                 required
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -112,7 +116,7 @@ export default function Home() {
                 <GraduationCap className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
                   id="college"
-                  placeholder="Enter your college name"
+                  placeholder="Organization used in previous rounds"
                   required
                   value={formData.college}
                   onChange={(e) => setFormData({ ...formData, college: e.target.value })}
@@ -126,7 +130,7 @@ export default function Home() {
                 <Label className="text-sm font-semibold">Select Challenge Level</Label>
                 {formData.level !== 'Basic' && (
                   <Badge variant="outline" className="text-[10px] uppercase border-amber-500 text-amber-600 bg-amber-50 gap-1">
-                    <ShieldCheck className="w-3 h-3" /> Admin Auth Required
+                    <ShieldCheck className="w-3 h-3" /> Qualification Required
                   </Badge>
                 )}
               </div>
@@ -156,7 +160,7 @@ export default function Home() {
                     <RadioGroupItem value="Intermediate" id="level-intermediate" />
                     <div>
                       <div className="font-bold">Intermediate</div>
-                      <div className="text-xs text-muted-foreground">Requires Basic Round Qualification</div>
+                      <div className="text-xs text-muted-foreground">Admin Approval Required</div>
                     </div>
                   </div>
                   <Award className={`w-5 h-5 ${formData.level === 'Intermediate' ? 'text-primary' : 'text-muted-foreground'}`} />
@@ -169,7 +173,7 @@ export default function Home() {
                     <RadioGroupItem value="Hard" id="level-hard" />
                     <div>
                       <div className="font-bold">Hard</div>
-                      <div className="text-xs text-muted-foreground">Finalist Championship Round</div>
+                      <div className="text-xs text-muted-foreground">Final Championship Round</div>
                     </div>
                   </div>
                   <Award className={`w-5 h-5 ${formData.level === 'Hard' ? 'text-primary' : 'text-muted-foreground'}`} />
@@ -182,12 +186,12 @@ export default function Home() {
               className="w-full bg-primary hover:bg-primary/90 text-white font-bold h-12 text-lg rounded-lg shadow-lg transition-transform active:scale-[0.98]"
               disabled={loading || !formData.name || !formData.college}
             >
-              {loading ? "Verifying Eligibility..." : "Begin Technical Challenge"}
+              {loading ? "Verifying..." : "Enter Challenge"}
             </Button>
           </form>
         </CardContent>
         <CardFooter className="justify-center border-t py-4">
-          <p className="text-xs text-muted-foreground font-medium">© 2024 TechQuiz Ascent. Official Precision Platform.</p>
+          <p className="text-xs text-muted-foreground font-medium">© 2024 TechQuiz Ascent.</p>
         </CardFooter>
       </Card>
     </div>

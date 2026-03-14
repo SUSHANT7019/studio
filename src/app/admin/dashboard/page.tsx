@@ -23,7 +23,6 @@ import {
   Edit, 
   LogOut, 
   Search, 
-  Filter,
   ShieldAlert,
   ArrowUpCircle,
   CheckCircle2,
@@ -110,10 +109,10 @@ export default function AdminDashboard() {
       .eq("id", participantId);
 
     if (error) {
-      toast({ title: "Error updating status", description: error.message, variant: "destructive" });
+      toast({ title: "Update Failed", description: error.message, variant: "destructive" });
     } else {
-      const action = nextLevel ? `Promoted to ${nextLevel}` : "Qualification removed";
-      toast({ title: "Updated!", description: action });
+      const action = nextLevel ? `Promoted to ${nextLevel}` : "Qualification revoked";
+      toast({ title: "Status Updated", description: action });
       fetchData();
     }
   };
@@ -129,15 +128,14 @@ export default function AdminDashboard() {
   }, [results, filterLevel, searchName]);
 
   const exportToCSV = () => {
-    const headers = ["Participant Name", "College Name", "Level", "Score", "Time Taken (s)", "Qualified For", "Submission Time"];
+    const headers = ["Participant", "College", "Attempted Level", "Score", "Time", "Qualified For"];
     const rows = filteredResults.map(r => [
       `"${r.participant_name}"`,
       `"${r.college_name}"`,
       r.level,
       r.score,
       r.time_taken,
-      r.qualified_for || "None",
-      new Date(r.submission_time).toLocaleString()
+      r.qualified_for || "None"
     ]);
 
     const csvContent = "data:text/csv;charset=utf-8," 
@@ -146,7 +144,7 @@ export default function AdminDashboard() {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `techquiz_results.csv`);
+    link.setAttribute("download", `quiz_results.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -161,13 +159,10 @@ export default function AdminDashboard() {
           <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
             <ShieldAlert className="text-white w-6 h-6" />
           </div>
-          <div>
-            <h1 className="text-xl font-headline font-bold text-foreground">TechQuiz Admin</h1>
-            <p className="text-xs text-muted-foreground font-medium">{session.user.email}</p>
-          </div>
+          <h1 className="text-xl font-headline font-bold text-foreground">Admin Control</h1>
         </div>
-        <Button variant="outline" size="sm" onClick={handleSignOut} className="gap-2 border-destructive text-destructive hover:bg-destructive hover:text-white transition-all">
-          <LogOut className="w-4 h-4" /> Sign Out
+        <Button variant="ghost" size="sm" onClick={handleSignOut} className="text-destructive">
+          <LogOut className="w-4 h-4 mr-2" /> Sign Out
         </Button>
       </header>
 
@@ -175,36 +170,34 @@ export default function AdminDashboard() {
         <Tabs defaultValue="results" className="space-y-6">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <TabsList className="bg-white shadow-sm h-12 p-1 border">
-              <TabsTrigger value="dashboard" className="gap-2"><LayoutDashboard className="w-4 h-4" /> Stats</TabsTrigger>
+              <TabsTrigger value="dashboard" className="gap-2"><LayoutDashboard className="w-4 h-4" /> Overview</TabsTrigger>
               <TabsTrigger value="questions" className="gap-2"><FileQuestion className="w-4 h-4" /> Questions</TabsTrigger>
-              <TabsTrigger value="results" className="gap-2"><Users className="w-4 h-4" /> Results & Promotion</TabsTrigger>
+              <TabsTrigger value="results" className="gap-2"><Users className="w-4 h-4" /> Participants & Promotion</TabsTrigger>
               <TabsTrigger value="rounds" className="gap-2"><Trophy className="w-4 h-4" /> Rounds</TabsTrigger>
             </TabsList>
 
-            <div className="flex gap-2">
-               <Button onClick={exportToCSV} variant="outline" className="gap-2 bg-white">
-                 <Download className="w-4 h-4" /> Export CSV
-               </Button>
-            </div>
+            <Button onClick={exportToCSV} variant="outline" className="gap-2 bg-white">
+              <Download className="w-4 h-4" /> Export Data
+            </Button>
           </div>
 
           <TabsContent value="dashboard">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                <Card className="border-l-4 border-l-primary shadow-sm">
                  <CardHeader className="pb-2">
-                   <CardDescription className="text-xs font-bold uppercase tracking-wider">Total Participants</CardDescription>
+                   <CardDescription className="text-xs font-bold uppercase">Total Submissions</CardDescription>
                    <CardTitle className="text-4xl font-black">{results.length}</CardTitle>
                  </CardHeader>
                </Card>
                <Card className="border-l-4 border-l-green-500 shadow-sm">
                  <CardHeader className="pb-2">
-                   <CardDescription className="text-xs font-bold uppercase tracking-wider">Qualified Next Round</CardDescription>
+                   <CardDescription className="text-xs font-bold uppercase">Promoted Participants</CardDescription>
                    <CardTitle className="text-4xl font-black">{results.filter(r => r.qualified_for).length}</CardTitle>
                  </CardHeader>
                </Card>
                <Card className="border-l-4 border-l-accent shadow-sm">
                  <CardHeader className="pb-2">
-                   <CardDescription className="text-xs font-bold uppercase tracking-wider">Bank Questions</CardDescription>
+                   <CardDescription className="text-xs font-bold uppercase">Active Questions</CardDescription>
                    <CardTitle className="text-4xl font-black">{questions.length}</CardTitle>
                  </CardHeader>
                </Card>
@@ -215,22 +208,22 @@ export default function AdminDashboard() {
             <Card className="shadow-lg">
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
-                  <CardTitle>Question Management</CardTitle>
-                  <CardDescription>Configure the technical question bank</CardDescription>
+                  <CardTitle>Question Bank</CardTitle>
+                  <CardDescription>Configure questions for different challenge levels.</CardDescription>
                 </div>
                 <Dialog open={isEditing !== null} onOpenChange={(open) => !open && setIsEditing(null)}>
                   <DialogTrigger asChild>
                     <Button onClick={() => setIsEditing({})} className="gap-2">
-                      <Plus className="w-5 h-5" /> Add New Question
+                      <Plus className="w-5 h-5" /> New Question
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                  <DialogContent className="max-w-2xl">
                     <form onSubmit={handleSaveQuestion} className="space-y-4">
-                      <DialogHeader><DialogTitle>{isEditing?.id ? "Edit Question" : "New Question"}</DialogTitle></DialogHeader>
+                      <DialogHeader><DialogTitle>{isEditing?.id ? "Update Question" : "Create Question"}</DialogTitle></DialogHeader>
                       <div className="space-y-4 py-4">
                         <div className="space-y-2">
                           <label className="text-sm font-bold">Question Text</label>
-                          <Textarea name="question_text" defaultValue={isEditing?.question_text} required placeholder="Question logic..." />
+                          <Textarea name="question_text" defaultValue={isEditing?.question_text} required />
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                           <Input name="option_a" defaultValue={isEditing?.option_a} placeholder="Option A" required />
@@ -249,7 +242,7 @@ export default function AdminDashboard() {
                             </SelectContent>
                           </Select>
                           <Select name="difficulty_level" defaultValue={isEditing?.difficulty_level || "Basic"}>
-                            <SelectTrigger><SelectValue placeholder="Level" /></SelectTrigger>
+                            <SelectTrigger><SelectValue placeholder="Difficulty" /></SelectTrigger>
                             <SelectContent>
                               <SelectItem value="Basic">Basic</SelectItem>
                               <SelectItem value="Intermediate">Intermediate</SelectItem>
@@ -259,8 +252,8 @@ export default function AdminDashboard() {
                         </div>
                       </div>
                       <DialogFooter>
-                        <Button type="button" variant="outline" onClick={() => setIsEditing(null)}>Cancel</Button>
-                        <Button type="submit">Save</Button>
+                        <Button type="button" variant="ghost" onClick={() => setIsEditing(null)}>Cancel</Button>
+                        <Button type="submit">Save Changes</Button>
                       </DialogFooter>
                     </form>
                   </DialogContent>
@@ -270,21 +263,19 @@ export default function AdminDashboard() {
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-secondary/50">
-                      <TableHead className="w-[450px]">Question</TableHead>
-                      <TableHead>Correct</TableHead>
+                      <TableHead>Question</TableHead>
                       <TableHead>Level</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead className="text-right">Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {questions.map((q) => (
                       <TableRow key={q.id}>
                         <TableCell className="font-medium line-clamp-1">{q.question_text}</TableCell>
-                        <TableCell><Badge className="bg-green-100 text-green-800">{q.correct_answer}</Badge></TableCell>
-                        <TableCell><Badge variant="secondary">{q.difficulty_level}</Badge></TableCell>
-                        <TableCell className="text-right flex justify-end gap-1">
+                        <TableCell><Badge variant="outline">{q.difficulty_level}</Badge></TableCell>
+                        <TableCell className="text-right">
                           <Button size="icon" variant="ghost" onClick={() => setIsEditing(q)}><Edit className="w-4 h-4" /></Button>
-                          <Button size="icon" variant="ghost" className="text-destructive hover:bg-destructive/10" onClick={() => handleDeleteQuestion(q.id)}><Trash2 className="w-4 h-4" /></Button>
+                          <Button size="icon" variant="ghost" className="text-destructive" onClick={() => handleDeleteQuestion(q.id)}><Trash2 className="w-4 h-4" /></Button>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -300,20 +291,20 @@ export default function AdminDashboard() {
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                   <div>
                     <CardTitle>Results & Promotion Dashboard</CardTitle>
-                    <CardDescription>Identify top performers and qualify them for higher levels.</CardDescription>
+                    <CardDescription>Qualify top performers for the next technical round.</CardDescription>
                   </div>
-                  <div className="flex flex-wrap gap-3">
+                  <div className="flex gap-3">
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       <Input 
-                        placeholder="Search name/college..." 
-                        className="pl-10 w-[240px]" 
+                        placeholder="Search..." 
+                        className="pl-10 w-[200px]" 
                         value={searchName}
                         onChange={(e) => setSearchName(e.target.value)}
                       />
                     </div>
                     <Select value={filterLevel} onValueChange={setFilterLevel}>
-                      <SelectTrigger className="w-[140px] bg-white"><SelectValue placeholder="Level" /></SelectTrigger>
+                      <SelectTrigger className="w-[140px]"><SelectValue placeholder="Filter Level" /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="All">All Levels</SelectItem>
                         <SelectItem value="Basic">Basic</SelectItem>
@@ -331,72 +322,62 @@ export default function AdminDashboard() {
                       <TableRow className="bg-secondary/50 font-bold">
                         <TableHead>Participant</TableHead>
                         <TableHead>College</TableHead>
-                        <TableHead>Attempted Level</TableHead>
+                        <TableHead>Current Level</TableHead>
                         <TableHead className="text-center">Score</TableHead>
-                        <TableHead>Current Status</TableHead>
-                        <TableHead className="text-right">Promotion Actions</TableHead>
+                        <TableHead>Promotion Status</TableHead>
+                        <TableHead className="text-right">Action</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {filteredResults.map((r) => (
-                        <TableRow key={r.id} className="hover:bg-primary/5 transition-colors">
+                        <TableRow key={r.id}>
                           <TableCell className="font-bold">{r.participant_name}</TableCell>
                           <TableCell className="text-muted-foreground">{r.college_name}</TableCell>
                           <TableCell><Badge variant="outline">{r.level}</Badge></TableCell>
-                          <TableCell className="text-center font-black text-primary text-lg">{r.score}</TableCell>
+                          <TableCell className="text-center font-black text-primary">{r.score}</TableCell>
                           <TableCell>
                             {r.qualified_for ? (
                               <Badge className="bg-green-600 text-white flex gap-1 w-fit">
-                                <CheckCircle2 className="w-3 h-3" /> Qualified: {r.qualified_for}
+                                <CheckCircle2 className="w-3 h-3" /> Promoted to {r.qualified_for}
                               </Badge>
                             ) : (
-                              <Badge variant="secondary" className="bg-amber-100 text-amber-700">Not Promoted</Badge>
+                              <Badge variant="secondary">Not Promoted</Badge>
                             )}
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-2">
-                              {/* Promotion Logic: Basic -> Intermediate, Intermediate -> Hard */}
-                              {r.level === 'Basic' && r.qualified_for !== 'Intermediate' && r.qualified_for !== 'Hard' && (
+                              {r.level === 'Basic' && r.qualified_for !== 'Intermediate' && (
                                 <Button 
                                   size="sm" 
-                                  variant="default" 
-                                  className="gap-1 bg-primary hover:bg-primary/90"
+                                  className="bg-primary h-8"
                                   onClick={() => handlePromote(r.id, 'Intermediate')}
                                 >
-                                  <ArrowUpCircle className="w-4 h-4" /> Qualify for Intermediate
+                                  <ArrowUpCircle className="w-3 h-3 mr-1" /> Promote to Intermediate
                                 </Button>
                               )}
                               {r.level === 'Intermediate' && r.qualified_for !== 'Hard' && (
                                 <Button 
                                   size="sm" 
-                                  variant="default" 
-                                  className="gap-1 bg-accent hover:bg-accent/90"
+                                  className="bg-accent h-8"
                                   onClick={() => handlePromote(r.id, 'Hard')}
                                 >
-                                  <ArrowUpCircle className="w-4 h-4" /> Qualify for Hard
+                                  <ArrowUpCircle className="w-3 h-3 mr-1" /> Promote to Hard
                                 </Button>
                               )}
                               {r.qualified_for && (
                                 <Button 
                                   size="sm" 
                                   variant="ghost" 
-                                  className="text-destructive hover:bg-destructive/10"
+                                  className="text-destructive h-8"
                                   onClick={() => handlePromote(r.id, null)}
                                 >
-                                  <XCircle className="w-4 h-4" /> Revoke
+                                  <XCircle className="w-3 h-3 mr-1" /> Revoke
                                 </Button>
                               )}
                             </div>
                           </TableCell>
                         </TableRow>
                       ))}
-                      {filteredResults.length === 0 && (
-                        <TableRow>
-                          <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
-                            No records found matching filters.
-                          </TableCell>
-                        </TableRow>
-                      )}
                     </TableBody>
                   </Table>
                 </div>
@@ -406,15 +387,16 @@ export default function AdminDashboard() {
 
           <TabsContent value="rounds">
              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card><CardHeader><CardTitle>Active Phases</CardTitle></CardHeader>
+                <Card><CardHeader><CardTitle>Phase Configuration</CardTitle></CardHeader>
                 <CardContent>
+                   <p className="text-sm text-muted-foreground mb-4">Manage the active competition rounds here.</p>
                    {rounds.map(rd => (
-                     <div key={rd.id} className="p-4 border rounded mb-2 flex justify-between items-center">
+                     <div key={rd.id} className="p-4 border rounded-lg mb-2 flex justify-between items-center bg-white shadow-sm">
                         <div>
                           <p className="font-bold">{rd.round_name}</p>
-                          <p className="text-xs text-muted-foreground">Level: {rd.level}</p>
+                          <p className="text-xs text-muted-foreground uppercase">{rd.level} Round</p>
                         </div>
-                        <Badge>Active</Badge>
+                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">ACTIVE</Badge>
                      </div>
                    ))}
                 </CardContent></Card>
