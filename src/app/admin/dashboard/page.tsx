@@ -31,7 +31,8 @@ import {
   UserCog,
   ArrowUpDown,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  FileSpreadsheet
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
@@ -164,9 +165,11 @@ export default function AdminDashboard() {
     const data = Object.fromEntries(formData.entries());
     
     const payload = {
-      ...data,
+      participant_name: data.participant_name,
+      college_name: data.college_name,
       score: parseInt(data.score as string, 10) || 0,
-      time_taken: parseInt(data.time_taken as string, 10) || 0
+      time_taken: parseInt(data.time_taken as string, 10) || 0,
+      level: data.level
     };
 
     if (isEditingParticipant?.id) {
@@ -217,7 +220,7 @@ export default function AdminDashboard() {
     });
   }, [results, filterLevel, searchName, sortConfig]);
 
-  const exportToCSV = () => {
+  const exportResultsToCSV = () => {
     const headers = ["Participant", "College", "Attempted Level", "Score", "Time (Seconds)", "Qualified For", "Date"];
     const rows = filteredResults.map(r => [
       `"${r.participant_name}"`,
@@ -236,6 +239,30 @@ export default function AdminDashboard() {
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
     link.setAttribute("download", `quiz_results.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const exportQuestionsToCSV = () => {
+    const headers = ["Question", "Option A", "Option B", "Option C", "Option D", "Correct Answer", "Difficulty"];
+    const rows = questions.map(q => [
+      `"${q.question_text.replace(/"/g, '""')}"`,
+      `"${q.option_a.replace(/"/g, '""')}"`,
+      `"${q.option_b.replace(/"/g, '""')}"`,
+      `"${q.option_c.replace(/"/g, '""')}"`,
+      `"${q.option_d.replace(/"/g, '""')}"`,
+      q.correct_answer,
+      q.difficulty_level
+    ]);
+
+    const csvContent = "data:text/csv;charset=utf-8," 
+      + [headers, ...rows].map(e => e.join(",")).join("\n");
+    
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `quiz_questions.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -289,7 +316,7 @@ export default function AdminDashboard() {
               <TabsTrigger value="rounds" className="gap-2"><Trophy className="w-4 h-4" /> Rounds</TabsTrigger>
             </TabsList>
 
-            <Button onClick={exportToCSV} variant="outline" className="gap-2 bg-white border-primary/20 text-primary hover:bg-primary/5">
+            <Button onClick={exportResultsToCSV} variant="outline" className="gap-2 bg-white border-primary/20 text-primary hover:bg-primary/5">
               <Download className="w-4 h-4" /> Export Results (CSV)
             </Button>
           </div>
@@ -324,73 +351,78 @@ export default function AdminDashboard() {
                   <CardTitle className="text-2xl font-black">Question Bank</CardTitle>
                   <CardDescription>Manage challenge items across all difficulty levels.</CardDescription>
                 </div>
-                <Dialog open={isEditing !== null} onOpenChange={(open) => !open && setIsEditing(null)}>
-                  <DialogTrigger asChild>
-                    <Button onClick={() => setIsEditing({})} className="gap-2 bg-primary h-11 px-6 font-bold shadow-lg shadow-primary/20">
-                      <Plus className="w-5 h-5" /> New Question
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-2xl">
-                    <form onSubmit={handleSaveQuestion} className="space-y-4">
-                      <DialogHeader>
-                        <DialogTitle className="text-2xl font-black">{isEditing?.id ? "Update Question" : "Create Question"}</DialogTitle>
-                      </DialogHeader>
-                      <div className="space-y-4 py-4">
-                        <div className="space-y-2">
-                          <label className="text-sm font-bold">Question Text</label>
-                          <Textarea name="question_text" defaultValue={isEditing?.question_text} required placeholder="Enter the technical question here..." className="min-h-[100px]" />
+                <div className="flex gap-3">
+                  <Button onClick={exportQuestionsToCSV} variant="outline" className="gap-2 h-11 px-4 font-bold border-secondary hover:bg-secondary/50">
+                    <FileSpreadsheet className="w-4 h-4" /> Export CSV
+                  </Button>
+                  <Dialog open={isEditing !== null} onOpenChange={(open) => !open && setIsEditing(null)}>
+                    <DialogTrigger asChild>
+                      <Button onClick={() => setIsEditing({})} className="gap-2 bg-primary h-11 px-6 font-bold shadow-lg shadow-primary/20">
+                        <Plus className="w-5 h-5" /> New Question
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-2xl">
+                      <form onSubmit={handleSaveQuestion} className="space-y-4">
+                        <DialogHeader>
+                          <DialogTitle className="text-2xl font-black">{isEditing?.id ? "Update Question" : "Create Question"}</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-4 py-4">
+                          <div className="space-y-2">
+                            <label className="text-sm font-bold">Question Text</label>
+                            <Textarea name="question_text" defaultValue={isEditing?.question_text} required placeholder="Enter the technical question here..." className="min-h-[100px]" />
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <label className="text-[10px] font-black uppercase text-muted-foreground">Option A</label>
+                              <Input name="option_a" defaultValue={isEditing?.option_a} placeholder="Option A" required />
+                            </div>
+                            <div className="space-y-2">
+                              <label className="text-[10px] font-black uppercase text-muted-foreground">Option B</label>
+                              <Input name="option_b" defaultValue={isEditing?.option_b} placeholder="Option B" required />
+                            </div>
+                            <div className="space-y-2">
+                              <label className="text-[10px] font-black uppercase text-muted-foreground">Option C</label>
+                              <Input name="option_c" defaultValue={isEditing?.option_c} placeholder="Option C" required />
+                            </div>
+                            <div className="space-y-2">
+                              <label className="text-[10px] font-black uppercase text-muted-foreground">Option D</label>
+                              <Input name="option_d" defaultValue={isEditing?.option_d} placeholder="Option D" required />
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4 pt-2">
+                            <div className="space-y-2">
+                              <label className="text-sm font-bold">Correct Answer</label>
+                              <Select name="correct_answer" defaultValue={isEditing?.correct_answer || "A"}>
+                                <SelectTrigger className="h-11"><SelectValue placeholder="Correct Answer" /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="A">A</SelectItem>
+                                  <SelectItem value="B">B</SelectItem>
+                                  <SelectItem value="C">C</SelectItem>
+                                  <SelectItem value="D">D</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-2">
+                              <label className="text-sm font-bold">Difficulty Level</label>
+                              <Select name="difficulty_level" defaultValue={isEditing?.difficulty_level || "Basic"}>
+                                <SelectTrigger className="h-11"><SelectValue placeholder="Difficulty" /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="Basic">Basic</SelectItem>
+                                  <SelectItem value="Intermediate">Intermediate</SelectItem>
+                                  <SelectItem value="Hard">Hard</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
                         </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <label className="text-[10px] font-black uppercase text-muted-foreground">Option A</label>
-                            <Input name="option_a" defaultValue={isEditing?.option_a} placeholder="Option A" required />
-                          </div>
-                          <div className="space-y-2">
-                            <label className="text-[10px] font-black uppercase text-muted-foreground">Option B</label>
-                            <Input name="option_b" defaultValue={isEditing?.option_b} placeholder="Option B" required />
-                          </div>
-                          <div className="space-y-2">
-                            <label className="text-[10px] font-black uppercase text-muted-foreground">Option C</label>
-                            <Input name="option_c" defaultValue={isEditing?.option_c} placeholder="Option C" required />
-                          </div>
-                          <div className="space-y-2">
-                            <label className="text-[10px] font-black uppercase text-muted-foreground">Option D</label>
-                            <Input name="option_d" defaultValue={isEditing?.option_d} placeholder="Option D" required />
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4 pt-2">
-                          <div className="space-y-2">
-                            <label className="text-sm font-bold">Correct Answer</label>
-                            <Select name="correct_answer" defaultValue={isEditing?.correct_answer || "A"}>
-                              <SelectTrigger className="h-11"><SelectValue placeholder="Correct Answer" /></SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="A">A</SelectItem>
-                                <SelectItem value="B">B</SelectItem>
-                                <SelectItem value="C">C</SelectItem>
-                                <SelectItem value="D">D</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="space-y-2">
-                            <label className="text-sm font-bold">Difficulty Level</label>
-                            <Select name="difficulty_level" defaultValue={isEditing?.difficulty_level || "Basic"}>
-                              <SelectTrigger className="h-11"><SelectValue placeholder="Difficulty" /></SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="Basic">Basic</SelectItem>
-                                <SelectItem value="Intermediate">Intermediate</SelectItem>
-                                <SelectItem value="Hard">Hard</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                      </div>
-                      <DialogFooter className="gap-2">
-                        <Button type="button" variant="ghost" onClick={() => setIsEditing(null)} className="font-bold">Cancel</Button>
-                        <Button type="submit" className="font-black px-8">Save Question</Button>
-                      </DialogFooter>
-                    </form>
-                  </DialogContent>
-                </Dialog>
+                        <DialogFooter className="gap-2">
+                          <Button type="button" variant="ghost" onClick={() => setIsEditing(null)} className="font-bold">Cancel</Button>
+                          <Button type="submit" className="font-black px-8">Save Question</Button>
+                        </DialogFooter>
+                      </form>
+                    </DialogContent>
+                  </Dialog>
+                </div>
               </CardHeader>
               <CardContent className="p-0">
                 <Table>
