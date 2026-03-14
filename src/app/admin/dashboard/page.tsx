@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -112,7 +112,6 @@ export default function AdminDashboard() {
     return sortConfig.direction === 'asc' ? <ArrowUp className="ml-1 w-3 h-3" /> : <ArrowDown className="ml-1 w-3 h-3" />;
   };
 
-  // Question Actions
   const handleDeleteQuestion = async (id: string) => {
     if (!confirm("Delete this question permanently?")) return;
     const { error } = await supabase.from("questions").delete().eq("id", id);
@@ -142,7 +141,6 @@ export default function AdminDashboard() {
     toast({ title: "Success", description: "Question bank updated." });
   };
 
-  // Participant Actions
   const handleDeleteParticipant = async (id: string) => {
     if (!confirm("Delete this participant record? This cannot be undone.")) return;
     const { error } = await supabase.from("participants").delete().eq("id", id);
@@ -252,30 +250,6 @@ export default function AdminDashboard() {
     document.body.removeChild(link);
   };
 
-  const exportQuestionsToCSV = () => {
-    const headers = ["Question", "Option A", "Option B", "Option C", "Option D", "Correct Answer", "Difficulty"];
-    const rows = questions.map(q => [
-      `"${q.question_text.replace(/"/g, '""')}"`,
-      `"${q.option_a.replace(/"/g, '""')}"`,
-      `"${q.option_b.replace(/"/g, '""')}"`,
-      `"${q.option_c.replace(/"/g, '""')}"`,
-      `"${q.option_d.replace(/"/g, '""')}"`,
-      q.correct_answer,
-      q.difficulty_level
-    ]);
-
-    const csvContent = "data:text/csv;charset=utf-8," 
-      + [headers, ...rows].map(e => e.join(",")).join("\n");
-    
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `quiz_questions.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
   const formatTimeTaken = (seconds: number) => {
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
@@ -362,9 +336,6 @@ export default function AdminDashboard() {
                   <CardDescription>Manage challenge items across all difficulty levels.</CardDescription>
                 </div>
                 <div className="flex gap-3">
-                  <Button onClick={exportQuestionsToCSV} variant="outline" className="gap-2 h-11 px-4 font-bold border-secondary hover:bg-secondary/50">
-                    <FileSpreadsheet className="w-4 h-4" /> Export CSV
-                  </Button>
                   <Dialog open={isEditing !== null} onOpenChange={(open) => !open && setIsEditing(null)}>
                     <DialogTrigger asChild>
                       <Button onClick={() => setIsEditing({})} className="gap-2 bg-primary h-11 px-6 font-bold shadow-lg shadow-primary/20">
@@ -375,7 +346,6 @@ export default function AdminDashboard() {
                       <form onSubmit={handleSaveQuestion} className="space-y-4">
                         <DialogHeader>
                           <DialogTitle className="text-2xl font-black">{isEditing?.id ? "Update Question" : "Create Question"}</DialogTitle>
-                          <DialogDescription>Fill in the details for the quiz question below.</DialogDescription>
                         </DialogHeader>
                         <div className="space-y-4 py-4">
                           <div className="space-y-2">
@@ -383,22 +353,10 @@ export default function AdminDashboard() {
                             <Textarea name="question_text" defaultValue={isEditing?.question_text} required placeholder="Enter the technical question here..." className="min-h-[100px]" />
                           </div>
                           <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <label className="text-[10px] font-black uppercase text-muted-foreground">Option A</label>
-                              <Input name="option_a" defaultValue={isEditing?.option_a} placeholder="Option A" required />
-                            </div>
-                            <div className="space-y-2">
-                              <label className="text-[10px] font-black uppercase text-muted-foreground">Option B</label>
-                              <Input name="option_b" defaultValue={isEditing?.option_b} placeholder="Option B" required />
-                            </div>
-                            <div className="space-y-2">
-                              <label className="text-[10px] font-black uppercase text-muted-foreground">Option C</label>
-                              <Input name="option_c" defaultValue={isEditing?.option_c} placeholder="Option C" required />
-                            </div>
-                            <div className="space-y-2">
-                              <label className="text-[10px] font-black uppercase text-muted-foreground">Option D</label>
-                              <Input name="option_d" defaultValue={isEditing?.option_d} placeholder="Option D" required />
-                            </div>
+                            <Input name="option_a" defaultValue={isEditing?.option_a} placeholder="Option A" required />
+                            <Input name="option_b" defaultValue={isEditing?.option_b} placeholder="Option B" required />
+                            <Input name="option_c" defaultValue={isEditing?.option_c} placeholder="Option C" required />
+                            <Input name="option_d" defaultValue={isEditing?.option_d} placeholder="Option D" required />
                           </div>
                           <div className="grid grid-cols-2 gap-4 pt-2">
                             <div className="space-y-2">
@@ -462,11 +420,7 @@ export default function AdminDashboard() {
                         <TableRow key={q.id} className="hover:bg-primary/5 transition-colors group">
                           <TableCell className="font-medium max-w-md truncate py-4">{q.question_text}</TableCell>
                           <TableCell className="py-4">
-                            <Badge variant="outline" className={
-                              q.difficulty_level === 'Hard' ? 'border-red-200 text-red-700 bg-red-50' : 
-                              q.difficulty_level === 'Intermediate' ? 'border-amber-200 text-amber-700 bg-amber-50' : 
-                              'border-blue-200 text-blue-700 bg-blue-50'
-                            }>{q.difficulty_level}</Badge>
+                            <Badge variant="outline">{q.difficulty_level}</Badge>
                           </TableCell>
                           <TableCell className="text-right py-4 pr-6">
                             <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -538,20 +492,6 @@ export default function AdminDashboard() {
                         value={scoreFilterValue}
                         onChange={(e) => setScoreFilterValue(e.target.value)}
                       />
-                      {(searchName || filterLevel !== "All" || scoreFilterValue !== "") && (
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="text-xs text-primary"
-                          onClick={() => {
-                            setSearchName("");
-                            setFilterLevel("All");
-                            setScoreFilterValue("");
-                          }}
-                        >
-                          Clear All
-                        </Button>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -677,7 +617,6 @@ export default function AdminDashboard() {
                 <DialogTitle className="text-2xl font-black flex items-center gap-2">
                   <UserCog className="w-6 h-6 text-primary" /> Edit Participant
                 </DialogTitle>
-                <DialogDescription>Modify results or identity details for this attempt.</DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
