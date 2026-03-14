@@ -28,7 +28,10 @@ import {
   CheckCircle2,
   XCircle,
   AlertTriangle,
-  UserCog
+  UserCog,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
@@ -43,9 +46,13 @@ export default function AdminDashboard() {
   const [session, setSession] = useState<any>(null);
   const [dbError, setDbError] = useState<string | null>(null);
 
-  // Filter states
+  // Filter & Sort states
   const [filterLevel, setFilterLevel] = useState("All");
   const [searchName, setSearchName] = useState("");
+  const [sortConfig, setSortConfig] = useState<{ field: string; direction: 'asc' | 'desc' }>({
+    field: 'submission_time',
+    direction: 'desc'
+  });
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -97,6 +104,18 @@ export default function AdminDashboard() {
     router.push("/admin");
   };
 
+  const toggleSort = (field: string) => {
+    setSortConfig(prev => ({
+      field,
+      direction: prev.field === field && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const renderSortIcon = (field: string) => {
+    if (sortConfig.field !== field) return <ArrowUpDown className="ml-1 w-3 h-3 opacity-50" />;
+    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-1 w-3 h-3" /> : <ArrowDown className="ml-1 w-3 h-3" />;
+  };
+
   // Question Actions
   const handleDeleteQuestion = async (id: string) => {
     if (!confirm("Delete this question permanently?")) return;
@@ -144,7 +163,6 @@ export default function AdminDashboard() {
     const formData = new FormData(e.currentTarget);
     const data = Object.fromEntries(formData.entries());
     
-    // Convert score to number
     const payload = {
       ...data,
       score: parseInt(data.score as string, 10) || 0,
@@ -179,24 +197,36 @@ export default function AdminDashboard() {
   };
 
   const filteredResults = useMemo(() => {
-    return results.filter(r => {
+    let filtered = results.filter(r => {
       const matchesLevel = filterLevel === "All" || r.level === filterLevel;
       const matchesName = 
         (r.participant_name?.toLowerCase() || "").includes(searchName.toLowerCase()) || 
         (r.college_name?.toLowerCase() || "").includes(searchName.toLowerCase());
       return matchesLevel && matchesName;
     });
-  }, [results, filterLevel, searchName]);
+
+    return filtered.sort((a, b) => {
+      const modifier = sortConfig.direction === 'asc' ? 1 : -1;
+      const field = sortConfig.field;
+      
+      if (field === 'score') return (a.score - b.score) * modifier;
+      if (field === 'time_taken') return (a.time_taken - b.time_taken) * modifier;
+      if (field === 'submission_time') return (new Date(a.submission_time).getTime() - new Date(b.submission_time).getTime()) * modifier;
+      
+      return 0;
+    });
+  }, [results, filterLevel, searchName, sortConfig]);
 
   const exportToCSV = () => {
-    const headers = ["Participant", "College", "Attempted Level", "Score", "Time (Seconds)", "Qualified For"];
+    const headers = ["Participant", "College", "Attempted Level", "Score", "Time (Seconds)", "Qualified For", "Date"];
     const rows = filteredResults.map(r => [
       `"${r.participant_name}"`,
       `"${r.college_name}"`,
       r.level,
       r.score,
       r.time_taken,
-      r.qualified_for || "None"
+      r.qualified_for || "None",
+      new Date(r.submission_time).toLocaleString()
     ]);
 
     const csvContent = "data:text/csv;charset=utf-8," 
@@ -209,6 +239,12 @@ export default function AdminDashboard() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const formatTimeTaken = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return m > 0 ? `${m}m ${s}s` : `${s}s`;
   };
 
   if (!session) return null;
@@ -296,7 +332,9 @@ export default function AdminDashboard() {
                   </DialogTrigger>
                   <DialogContent className="max-w-2xl">
                     <form onSubmit={handleSaveQuestion} className="space-y-4">
-                      <DialogHeader><DialogTitle className="text-2xl font-black">{isEditing?.id ? "Update Question" : "Create Question"}</DialogTitle></DialogHeader>
+                      <DialogHeader>
+                        <DialogTitle className="text-2xl font-black">{isEditing?.id ? "Update Question" : "Create Question"}</DialogTitle>
+                      </DialogHeader>
                       <div className="space-y-4 py-4">
                         <div className="space-y-2">
                           <label className="text-sm font-bold">Question Text</label>
@@ -430,7 +468,22 @@ export default function AdminDashboard() {
                     <TableRow className="bg-secondary/50 hover:bg-secondary/50">
                       <TableHead className="font-bold py-4">Participant Detail</TableHead>
                       <TableHead className="font-bold py-4">Attempt</TableHead>
-                      <TableHead className="font-bold py-4 text-center">Score</TableHead>
+                      <TableHead 
+                        className="font-bold py-4 text-center cursor-pointer hover:text-primary transition-colors"
+                        onClick={() => toggleSort('score')}
+                      >
+                        <div className="flex items-center justify-center">
+                          Score {renderSortIcon('score')}
+                        </div>
+                      </TableHead>
+                      <TableHead 
+                        className="font-bold py-4 text-center cursor-pointer hover:text-primary transition-colors"
+                        onClick={() => toggleSort('time_taken')}
+                      >
+                        <div className="flex items-center justify-center">
+                          Time Taken {renderSortIcon('time_taken')}
+                        </div>
+                      </TableHead>
                       <TableHead className="font-bold py-4">Status / Promotion</TableHead>
                       <TableHead className="font-bold py-4 text-right pr-6">Admin Actions</TableHead>
                     </TableRow>
@@ -438,7 +491,7 @@ export default function AdminDashboard() {
                   <TableBody>
                     {filteredResults.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">No records found.</TableCell>
+                        <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">No records found.</TableCell>
                       </TableRow>
                     ) : (
                       filteredResults.map((r) => (
@@ -456,6 +509,11 @@ export default function AdminDashboard() {
                             <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 text-primary font-black">
                               {r.score}
                             </div>
+                          </TableCell>
+                          <TableCell className="text-center py-4">
+                            <span className="font-mono font-bold text-muted-foreground">
+                              {formatTimeTaken(r.time_taken)}
+                            </span>
                           </TableCell>
                           <TableCell className="py-4">
                             <div className="flex flex-col gap-1.5">

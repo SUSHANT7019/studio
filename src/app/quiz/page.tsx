@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
@@ -90,14 +89,14 @@ export default function QuizPage() {
           level: participant.level,
           score: calculatedScore,
           total_questions: questions.length,
-          time_taken: Math.floor(timeSpentSeconds), // Must be an integer
+          time_taken: Math.max(0, Math.floor(timeSpentSeconds)),
           submission_time: new Date().toISOString(),
           quiz_date: new Date().toISOString().split("T")[0],
         })
         .select('id');
 
       if (pError) {
-        console.error("Supabase error submitting participant:", pError.message, pError.details);
+        console.error("Supabase participants error:", pError);
         throw new Error(pError.message);
       }
 
@@ -162,6 +161,7 @@ export default function QuizPage() {
         return;
       }
 
+      // Shuffling logic
       const shuffled = [...data].sort(() => 0.5 - Math.random());
       const selected = shuffled.slice(0, 15);
       
