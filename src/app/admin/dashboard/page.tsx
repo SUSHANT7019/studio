@@ -532,7 +532,7 @@ export default function AdminDashboard() {
             <ShieldAlert className="text-white w-6 h-6" />
           </div>
           <div className="flex flex-col">
-            <h1 className="text-xl font-headline font-bold text-foreground leading-tight">TechQuiz Admin</h1>
+            <h1 className="text-xl font-headline font-bold text-foreground leading-tight">Technical Quizz Admin</h1>
             <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">{session?.user?.email}</span>
           </div>
         </div>
