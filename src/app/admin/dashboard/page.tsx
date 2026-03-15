@@ -172,26 +172,45 @@ export default function AdminDashboard() {
     reader.onload = async (event) => {
       try {
         const text = event.target?.result as string;
-        // Simple CSV parser that handles basic quotes
         const lines = text.split(/\r?\n/).filter(line => line.trim() !== "");
         if (lines.length < 2) throw new Error("File is empty or missing headers.");
 
-        const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+        const rawHeaders = lines[0].split(',').map(h => h.trim().toLowerCase());
         const expectedHeaders = ['question_text', 'option_a', 'option_b', 'option_c', 'option_d', 'correct_answer', 'difficulty_level'];
         
-        const missing = expectedHeaders.filter(h => !headers.includes(h));
+        const missing = expectedHeaders.filter(h => !rawHeaders.includes(h));
         if (missing.length > 0) throw new Error(`Missing headers: ${missing.join(', ')}`);
 
+        // Robust CSV line parser that handles commas inside quotes
+        const parseCsvLine = (line: string) => {
+          const result = [];
+          let curValue = "";
+          let inQuotes = false;
+          for (let i = 0; i < line.length; i++) {
+            const char = line[i];
+            if (char === '"') {
+              inQuotes = !inQuotes;
+            } else if (char === ',' && !inQuotes) {
+              result.push(curValue.trim());
+              curValue = "";
+            } else {
+              curValue += char;
+            }
+          }
+          result.push(curValue.trim());
+          return result;
+        };
+
         const dataToInsert = lines.slice(1).map(line => {
-          // Regex to split by comma but ignore commas inside double quotes
-          const values = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
-          if (!values || values.length < expectedHeaders.length) return null;
+          const values = parseCsvLine(line);
+          if (values.length < expectedHeaders.length) return null;
 
           const row: any = {};
-          headers.forEach((header, index) => {
-            if (expectedHeaders.includes(header)) {
-              let val = values[index]?.trim() || "";
-              // Remove wrapping double quotes if present
+          expectedHeaders.forEach(header => {
+            const indexInRaw = rawHeaders.indexOf(header);
+            if (indexInRaw !== -1) {
+              let val = values[indexInRaw] || "";
+              // Strip surrounding quotes if present
               if (val.startsWith('"') && val.endsWith('"')) val = val.substring(1, val.length - 1);
               row[header] = val;
             }
@@ -210,7 +229,6 @@ export default function AdminDashboard() {
         toast({ title: "Import Error", description: err.message, variant: "destructive" });
       } finally {
         setIsCsvUploading(false);
-        // Clear input
         e.target.value = "";
       }
     };
@@ -220,7 +238,7 @@ export default function AdminDashboard() {
 
   const downloadCsvTemplate = () => {
     const headers = ["question_text", "option_a", "option_b", "option_c", "option_d", "correct_answer", "difficulty_level"];
-    const sample = ["What is React?", "Library", "Framework", "Language", "Database", "A", "Basic"];
+    const sample = ["\"What is the primary purpose of React?\"", "Library", "Framework", "Language", "Database", "A", "Basic"];
     const csvContent = "data:text/csv;charset=utf-8," + [headers, sample].map(e => e.join(",")).join("\n");
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
@@ -562,7 +580,7 @@ export default function AdminDashboard() {
                     ) : (
                       questions.map((q) => (
                         <TableRow key={q.id} className="hover:bg-primary/5 transition-colors group">
-                          <TableCell className="font-medium max-w-md truncate py-4">{q.question_text}</TableCell>
+                          <TableCell className="font-medium max-w-2xl py-4">{q.question_text}</TableCell>
                           <TableCell className="py-4">
                             <Badge variant="outline">{q.difficulty_level}</Badge>
                           </TableCell>
