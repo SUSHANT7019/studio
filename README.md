@@ -10,7 +10,7 @@ TechQuiz Ascent is a precision technical competition platform built with **Next.
 - **Dynamic Quiz Engine**:
   - True random question shuffling (Fisher-Yates).
   - Real-time countdown timer with auto-submission.
-  - **Question Navigator**: Sidebar to track attempted vs. unattempted items.
+  - **Question Navigator**: Right-side sidebar to track attempted vs. unattempted items with color-coding.
   - Persistent state: Progress is saved locally in case of accidental refresh.
 
 ### 🛡️ Admin Portal
@@ -67,7 +67,8 @@ CREATE TABLE participants (
 ```
 
 ### 2. Environment Variables
-Add these to your `.env.local`:
+Create a file named `.env.local` in the **root directory** (the same folder as `package.json`):
+
 ```env
 NEXT_PUBLIC_SUPABASE_URL=your_project_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
