@@ -329,8 +329,6 @@ export default function AdminDashboard() {
     if (selectedParticipants.length === 0) return;
 
     // Filter eligible participants based on strict level progression
-    // Basic attempters can only go to Intermediate
-    // Intermediate attempters can only go to Hard
     const eligibleParticipants = results.filter(r => 
       selectedParticipants.includes(r.id) && (
         (targetLevel === 'Intermediate' && r.level === 'Basic') ||
@@ -338,21 +336,21 @@ export default function AdminDashboard() {
       )
     );
 
+    const skippedCount = selectedParticipants.length - eligibleParticipants.length;
+
     if (eligibleParticipants.length === 0) {
       toast({ 
-        title: "Promotion Blocked", 
-        description: `None of the selected participants are eligible for direct promotion to ${targetLevel}. Progression must be step-by-step.`, 
+        title: "Promotion Invalid", 
+        description: `Standard progression is required (Basic → Intermediate → Hard). None of the selected participants are eligible for ${targetLevel} right now.`, 
         variant: "destructive" 
       });
       return;
     }
 
     const eligibleIds = eligibleParticipants.map(p => p.id);
-    const skippedCount = selectedParticipants.length - eligibleIds.length;
-
-    const message = `Promote ${eligibleIds.length} eligible participants to ${targetLevel}?${skippedCount > 0 ? ` Note: ${skippedCount} participants will be skipped because they are attempting a level skip which is not allowed.` : ''}`;
+    const confirmMsg = `Promote ${eligibleIds.length} participants to ${targetLevel}?${skippedCount > 0 ? ` (${skippedCount} ineligible records will be skipped).` : ''}`;
     
-    if (!confirm(message)) return;
+    if (!confirm(confirmMsg)) return;
 
     try {
       const { error } = await supabase
@@ -363,12 +361,12 @@ export default function AdminDashboard() {
       if (error) throw error;
 
       toast({ 
-        title: "Batch Promoted", 
-        description: `Successfully qualified ${eligibleIds.length} participants for ${targetLevel}.${skippedCount > 0 ? ` Skipped ${skippedCount} ineligible records.` : ''}` 
+        title: "Promotion Successful", 
+        description: `Updated ${eligibleIds.length} records. ${skippedCount > 0 ? `Skipped ${skippedCount} ineligible participants.` : ''}` 
       });
       fetchData();
     } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      toast({ title: "Update Failed", description: err.message, variant: "destructive" });
     }
   };
 
@@ -398,6 +396,16 @@ export default function AdminDashboard() {
   };
 
   const handlePromote = async (participantId: string, nextLevel: string | null) => {
+    // Safety check for individual promotion
+    const p = results.find(item => item.id === participantId);
+    if (nextLevel && p) {
+      const isIllegalJump = (p.level === 'Basic' && nextLevel === 'Hard');
+      if (isIllegalJump) {
+        toast({ title: "Illegal Promotion", description: "Basic participants cannot skip to Hard. Promote to Intermediate first.", variant: "destructive" });
+        return;
+      }
+    }
+
     const { error } = await supabase
       .from("participants")
       .update({ qualified_for: nextLevel })
