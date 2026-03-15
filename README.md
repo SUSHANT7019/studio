@@ -19,6 +19,7 @@ TechQuiz Ascent is a precision technical competition platform built with **Next.
 - **Question Bank Management**:
   - Full CRUD operations for technical questions.
   - Difficulty level assignment.
+  - **Bulk CSV Upload**: Upload hundreds of questions at once using a template.
   - **CSV Export**: Download the entire question bank.
 - **Participant Management**:
   - **Promotion Workflow**: Review scores and promote high-performers to higher levels.
@@ -78,6 +79,10 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
 1. Go to **Supabase Authentication** -> **Users**.
 2. Add a new user (e.g., `admin@example.com`).
 3. Log in via the `/admin` route.
+
+### 4. CSV Bulk Upload Format
+When uploading questions, ensure your CSV headers are:
+`question_text,option_a,option_b,option_c,option_d,correct_answer,difficulty_level`
 
 ## 📁 Project Structure
 - `src/app/` - Next.js App Router pages.

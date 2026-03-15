@@ -34,7 +34,9 @@ import {
   XCircle,
   Filter,
   Trophy,
-  FileDown
+  FileDown,
+  Upload,
+  Info
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
@@ -45,6 +47,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState<any>(null);
   const [isEditingParticipant, setIsEditingParticipant] = useState<any>(null);
+  const [isCsvUploading, setIsCsvUploading] = useState(false);
   const [session, setSession] = useState<any>(null);
   const [dbError, setDbError] = useState<string | null>(null);
 
@@ -159,6 +162,75 @@ export default function AdminDashboard() {
     toast({ title: "Success", description: "Question bank updated." });
   };
 
+  const handleCsvBulkUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsCsvUploading(true);
+    const reader = new FileReader();
+
+    reader.onload = async (event) => {
+      try {
+        const text = event.target?.result as string;
+        // Simple CSV parser that handles basic quotes
+        const lines = text.split(/\r?\n/).filter(line => line.trim() !== "");
+        if (lines.length < 2) throw new Error("File is empty or missing headers.");
+
+        const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+        const expectedHeaders = ['question_text', 'option_a', 'option_b', 'option_c', 'option_d', 'correct_answer', 'difficulty_level'];
+        
+        const missing = expectedHeaders.filter(h => !headers.includes(h));
+        if (missing.length > 0) throw new Error(`Missing headers: ${missing.join(', ')}`);
+
+        const dataToInsert = lines.slice(1).map(line => {
+          // Regex to split by comma but ignore commas inside double quotes
+          const values = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
+          if (!values || values.length < expectedHeaders.length) return null;
+
+          const row: any = {};
+          headers.forEach((header, index) => {
+            if (expectedHeaders.includes(header)) {
+              let val = values[index]?.trim() || "";
+              // Remove wrapping double quotes if present
+              if (val.startsWith('"') && val.endsWith('"')) val = val.substring(1, val.length - 1);
+              row[header] = val;
+            }
+          });
+          return row;
+        }).filter(row => row !== null);
+
+        if (dataToInsert.length === 0) throw new Error("No valid data rows found.");
+
+        const { error } = await supabase.from("questions").insert(dataToInsert);
+        if (error) throw error;
+
+        toast({ title: "Upload Success", description: `Imported ${dataToInsert.length} questions.` });
+        fetchData();
+      } catch (err: any) {
+        toast({ title: "Import Error", description: err.message, variant: "destructive" });
+      } finally {
+        setIsCsvUploading(false);
+        // Clear input
+        e.target.value = "";
+      }
+    };
+
+    reader.readAsText(file);
+  };
+
+  const downloadCsvTemplate = () => {
+    const headers = ["question_text", "option_a", "option_b", "option_c", "option_d", "correct_answer", "difficulty_level"];
+    const sample = ["What is React?", "Library", "Framework", "Language", "Database", "A", "Basic"];
+    const csvContent = "data:text/csv;charset=utf-8," + [headers, sample].map(e => e.join(",")).join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "questions_template.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const handleDeleteParticipant = async (id: string) => {
     if (!confirm("Delete this participant record? This cannot be undone.")) return;
     const { error } = await supabase.from("participants").delete().eq("id", id);
@@ -262,7 +334,7 @@ export default function AdminDashboard() {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `quiz_results.csv`);
+    link.setAttribute("download", `quizz_results.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -342,7 +414,7 @@ export default function AdminDashboard() {
               <TabsTrigger value="results" className="gap-2"><Users className="w-4 h-4" /> Participants</TabsTrigger>
             </TabsList>
 
-            <Button onClick={exportResultsToCSV} variant="outline" className="gap-2 bg-white border-primary/20 text-primary hover:bg-primary/5">
+            <Button onClick={exportResultsToCSV} variant="outline" className="gap-2 bg-white border-primary/20 text-primary hover:bg-primary">
               <Download className="w-4 h-4" /> Export Results (CSV)
             </Button>
           </div>
@@ -372,19 +444,34 @@ export default function AdminDashboard() {
 
           <TabsContent value="questions">
             <Card className="shadow-lg border-0 overflow-hidden">
-              <CardHeader className="bg-white border-b flex flex-row items-center justify-between py-6">
+              <CardHeader className="bg-white border-b flex flex-col md:flex-row items-center justify-between py-6 gap-4">
                 <div>
                   <CardTitle className="text-2xl font-black">Question Bank</CardTitle>
-                  <CardDescription>Manage challenge items across all difficulty levels.</CardDescription>
+                  <CardDescription>Manage challenge items individually or via bulk upload.</CardDescription>
                 </div>
-                <div className="flex gap-3">
-                  <Button onClick={exportQuestionsToCSV} variant="outline" size="sm" className="gap-2 border-primary/20 text-primary hover:bg-primary/5 h-11 px-4 font-bold">
-                    <FileDown className="w-5 h-5" /> Download (CSV)
+                <div className="flex flex-wrap gap-2">
+                  <Button onClick={exportQuestionsToCSV} variant="outline" size="sm" className="gap-2 border-slate-200 h-10 px-4 font-bold text-slate-600">
+                    <FileDown className="w-4 h-4" /> Export CSV
                   </Button>
+                  
+                  <div className="relative">
+                    <input 
+                      type="file" 
+                      accept=".csv" 
+                      onChange={handleCsvBulkUpload} 
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      disabled={isCsvUploading}
+                    />
+                    <Button variant="outline" size="sm" className="gap-2 border-primary/20 text-primary h-10 px-4 font-bold" disabled={isCsvUploading}>
+                      {isCsvUploading ? <span className="animate-spin">⌛</span> : <Upload className="w-4 h-4" />}
+                      Bulk Upload
+                    </Button>
+                  </div>
+
                   <Dialog open={isEditing !== null} onOpenChange={(open) => !open && setIsEditing(null)}>
                     <DialogTrigger asChild>
-                      <Button onClick={() => setIsEditing({})} className="gap-2 bg-primary h-11 px-6 font-bold shadow-lg shadow-primary/20">
-                        <Plus className="w-5 h-5" /> New Question
+                      <Button onClick={() => setIsEditing({})} className="gap-2 bg-primary h-10 px-6 font-bold shadow-lg shadow-primary/20">
+                        <Plus className="w-4 h-4" /> New Question
                       </Button>
                     </DialogTrigger>
                     <DialogContent className="max-w-2xl">
@@ -438,6 +525,18 @@ export default function AdminDashboard() {
                   </Dialog>
                 </div>
               </CardHeader>
+
+              {/* CSV Upload Help Banner */}
+              <div className="bg-primary/5 px-6 py-3 border-b flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs text-primary font-medium">
+                  <Info className="w-4 h-4" />
+                  <span>Bulk Upload requires CSV with specific headers.</span>
+                </div>
+                <Button variant="link" size="sm" onClick={downloadCsvTemplate} className="text-xs h-auto p-0 font-bold">
+                  Download Template CSV
+                </Button>
+              </div>
+
               <CardContent className="p-0">
                 <Table>
                   <TableHeader>

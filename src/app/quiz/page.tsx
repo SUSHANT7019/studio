@@ -295,7 +295,7 @@ export default function QuizPage() {
     <div className="min-h-screen bg-background flex flex-col font-body">
       <header className="bg-white border-b sticky top-0 z-20 px-6 py-4 shadow-sm flex items-center justify-between">
         <div className="flex flex-col">
-          <h1 className="text-xl font-headline font-bold text-primary">TechQuiz Ascent</h1>
+          <h1 className="text-xl font-headline font-bold text-primary">Technical Quizz</h1>
           <p className="text-xs text-muted-foreground">{participant?.name} • {participant?.college}</p>
         </div>
         

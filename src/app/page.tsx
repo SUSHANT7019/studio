@@ -107,7 +107,7 @@ export default function Home() {
           <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-2">
             <BrainCircuit className="w-8 h-8 text-primary" />
           </div>
-          <CardTitle className="text-3xl font-headline font-bold text-primary">TechQuiz Ascent</CardTitle>
+          <CardTitle className="text-3xl font-headline font-bold text-primary">Technical Quizz</CardTitle>
           <CardDescription className="text-muted-foreground font-medium">
             Join the precision technical challenge.
           </CardDescription>
@@ -188,7 +188,7 @@ export default function Home() {
                     <RadioGroupItem value="Hard" id="level-hard" />
                     <div>
                       <div className="font-bold">Championship (Hard)</div>
-                      <div className="text-xs text-muted-foreground">Final Stage • Invitation Only</div>
+                      <div className="text-xs text-muted-foreground">Final Stage • Requirs Admin Approval </div>
                     </div>
                   </div>
                   <Award className={`w-5 h-5 ${formData.level === 'Hard' ? 'text-primary' : 'text-muted-foreground'}`} />
@@ -210,7 +210,9 @@ export default function Home() {
             <Info className="w-3 h-3 shrink-0 mt-0.5" />
             <p>Ensure your name and college match exactly what you used in previous rounds. Contact organizers if you believe you were promoted but cannot enter.</p>
           </div>
-          <p className="text-[10px] text-muted-foreground font-medium">© 2024 TechQuiz Ascent.</p>
+          <p className="text-[10px] text-muted-foreground font-medium">© 2026 TechQuiz Ascent.</p>
+          <p className="text-[10px] text-muted-foreground font-medium">Made with ❤️ by Thadge Sushant.</p>
+        
         </CardFooter>
       </Card>
     </div>
