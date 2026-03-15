@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Checkbox } from "@/components/ui/checkbox";
 import { 
   LayoutDashboard, 
   FileQuestion, 
@@ -51,7 +52,11 @@ export default function AdminDashboard() {
   const [session, setSession] = useState<any>(null);
   const [dbError, setDbError] = useState<string | null>(null);
 
-  // Filter & Sort states
+  // Question selection for bulk actions
+  const [selectedQuestions, setSelectedQuestions] = useState<string[]>([]);
+  const [qFilterLevel, setQFilterLevel] = useState("All");
+
+  // Participant Filter & Sort states
   const [filterLevel, setFilterLevel] = useState("All");
   const [searchName, setSearchName] = useState("");
   const [scoreFilterValue, setScoreFilterValue] = useState<string>("");
@@ -108,6 +113,7 @@ export default function AdminDashboard() {
       
       setQuestions(qsRes.data || []);
       setResults(rsRes.data || []);
+      setSelectedQuestions([]); // Reset selection on fetch
     } catch (error: any) {
       console.error("Fetch error:", error);
       setDbError(error.message);
@@ -133,6 +139,7 @@ export default function AdminDashboard() {
     return sortConfig.direction === 'asc' ? <ArrowUp className="ml-1 w-3 h-3" /> : <ArrowDown className="ml-1 w-3 h-3" />;
   };
 
+  // Question Management Functions
   const handleDeleteQuestion = async (id: string) => {
     if (!confirm("Delete this question permanently?")) return;
     const { error } = await supabase.from("questions").delete().eq("id", id);
@@ -141,6 +148,25 @@ export default function AdminDashboard() {
     } else {
       fetchData();
       toast({ title: "Deleted", description: "Question removed successfully." });
+    }
+  };
+
+  const handleBulkDeleteQuestions = async () => {
+    if (selectedQuestions.length === 0) return;
+    if (!confirm(`Are you sure you want to delete ${selectedQuestions.length} selected questions?`)) return;
+
+    try {
+      const { error } = await supabase
+        .from("questions")
+        .delete()
+        .in("id", selectedQuestions);
+
+      if (error) throw error;
+
+      toast({ title: "Success", description: `Deleted ${selectedQuestions.length} questions.` });
+      fetchData();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
     }
   };
 
@@ -181,7 +207,6 @@ export default function AdminDashboard() {
         const missing = expectedHeaders.filter(h => !rawHeaders.includes(h));
         if (missing.length > 0) throw new Error(`Missing headers: ${missing.join(', ')}`);
 
-        // Robust CSV line parser that handles commas inside quotes
         const parseCsvLine = (line: string) => {
           const result = [];
           let curValue = "";
@@ -210,7 +235,6 @@ export default function AdminDashboard() {
             const indexInRaw = rawHeaders.indexOf(header);
             if (indexInRaw !== -1) {
               let val = values[indexInRaw] || "";
-              // Strip surrounding quotes if present
               if (val.startsWith('"') && val.endsWith('"')) val = val.substring(1, val.length - 1);
               row[header] = val;
             }
@@ -249,6 +273,27 @@ export default function AdminDashboard() {
     document.body.removeChild(link);
   };
 
+  // Filtered Questions
+  const filteredQuestions = useMemo(() => {
+    return questions.filter(q => qFilterLevel === "All" || q.difficulty_level === qFilterLevel);
+  }, [questions, qFilterLevel]);
+
+  // Select all logic
+  const handleSelectAllQuestions = (checked: boolean) => {
+    if (checked) {
+      setSelectedQuestions(filteredQuestions.map(q => q.id));
+    } else {
+      setSelectedQuestions([]);
+    }
+  };
+
+  const handleToggleQuestionSelection = (id: string) => {
+    setSelectedQuestions(prev => 
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  };
+
+  // Participant Management Functions
   const handleDeleteParticipant = async (id: string) => {
     if (!confirm("Delete this participant record? This cannot be undone.")) return;
     const { error } = await supabase.from("participants").delete().eq("id", id);
@@ -360,7 +405,7 @@ export default function AdminDashboard() {
 
   const exportQuestionsToCSV = () => {
     const headers = ["Question", "Option A", "Option B", "Option C", "Option D", "Correct Answer", "Difficulty"];
-    const rows = questions.map(q => [
+    const rows = filteredQuestions.map(q => [
       `"${q.question_text.replace(/"/g, '""')}"`,
       `"${q.option_a.replace(/"/g, '""')}"`,
       `"${q.option_b.replace(/"/g, '""')}"`,
@@ -463,11 +508,29 @@ export default function AdminDashboard() {
           <TabsContent value="questions">
             <Card className="shadow-lg border-0 overflow-hidden">
               <CardHeader className="bg-white border-b flex flex-col md:flex-row items-center justify-between py-6 gap-4">
-                <div>
+                <div className="flex flex-col gap-1">
                   <CardTitle className="text-2xl font-black">Question Bank</CardTitle>
                   <CardDescription>Manage challenge items individually or via bulk upload.</CardDescription>
                 </div>
                 <div className="flex flex-wrap gap-2">
+                  {selectedQuestions.length > 0 && (
+                    <Button onClick={handleBulkDeleteQuestions} variant="destructive" size="sm" className="gap-2 h-10 px-4 font-bold shadow-lg shadow-destructive/20">
+                      <Trash2 className="w-4 h-4" /> Delete ({selectedQuestions.length})
+                    </Button>
+                  )}
+
+                  <Select value={qFilterLevel} onValueChange={setQFilterLevel}>
+                    <SelectTrigger className="w-[140px] h-10 bg-white font-semibold">
+                      <SelectValue placeholder="All Levels" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="All">All Levels</SelectItem>
+                      <SelectItem value="Basic">Basic</SelectItem>
+                      <SelectItem value="Intermediate">Intermediate</SelectItem>
+                      <SelectItem value="Hard">Hard</SelectItem>
+                    </SelectContent>
+                  </Select>
+
                   <Button onClick={exportQuestionsToCSV} variant="outline" size="sm" className="gap-2 border-slate-200 h-10 px-4 font-bold text-slate-600">
                     <FileDown className="w-4 h-4" /> Export CSV
                   </Button>
@@ -559,6 +622,13 @@ export default function AdminDashboard() {
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-secondary/50 hover:bg-secondary/50">
+                      <TableHead className="w-12 text-center">
+                        <Checkbox 
+                          checked={filteredQuestions.length > 0 && selectedQuestions.length === filteredQuestions.length}
+                          onCheckedChange={handleSelectAllQuestions}
+                          aria-label="Select all questions"
+                        />
+                      </TableHead>
                       <TableHead className="py-4 font-bold">Question Detail</TableHead>
                       <TableHead className="py-4 font-bold">Level</TableHead>
                       <TableHead className="py-4 font-bold text-right pr-6">Management</TableHead>
@@ -568,18 +638,26 @@ export default function AdminDashboard() {
                     {loading ? (
                       Array.from({ length: 5 }).map((_, i) => (
                         <TableRow key={i}>
+                          <TableCell className="text-center"><Skeleton className="h-4 w-4 mx-auto" /></TableCell>
                           <TableCell><Skeleton className="h-5 w-full" /></TableCell>
                           <TableCell><Skeleton className="h-5 w-20" /></TableCell>
                           <TableCell className="text-right pr-6"><Skeleton className="h-8 w-16 ml-auto" /></TableCell>
                         </TableRow>
                       ))
-                    ) : questions.length === 0 ? (
+                    ) : filteredQuestions.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={3} className="h-32 text-center text-muted-foreground">No questions found.</TableCell>
+                        <TableCell colSpan={4} className="h-32 text-center text-muted-foreground">No questions found for the selected level.</TableCell>
                       </TableRow>
                     ) : (
-                      questions.map((q) => (
+                      filteredQuestions.map((q) => (
                         <TableRow key={q.id} className="hover:bg-primary/5 transition-colors group">
+                          <TableCell className="text-center">
+                            <Checkbox 
+                              checked={selectedQuestions.includes(q.id)}
+                              onCheckedChange={() => handleToggleQuestionSelection(q.id)}
+                              aria-label={`Select question ${q.id}`}
+                            />
+                          </TableCell>
                           <TableCell className="font-medium max-w-2xl py-4">{q.question_text}</TableCell>
                           <TableCell className="py-4">
                             <Badge variant="outline">{q.difficulty_level}</Badge>
@@ -628,7 +706,7 @@ export default function AdminDashboard() {
                     </div>
 
                     <Select value={filterLevel} onValueChange={setFilterLevel}>
-                      <SelectTrigger className="w-[140px] h-10 bg-white"><SelectValue placeholder="All Levels" /></SelectTrigger>
+                      <SelectTrigger className="w-[140px] h-10 bg-white font-semibold"><SelectValue placeholder="All Levels" /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="All">All Levels</SelectItem>
                         <SelectItem value="Basic">Basic</SelectItem>
