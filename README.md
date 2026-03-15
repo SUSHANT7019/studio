@@ -10,7 +10,7 @@ TechQuiz Ascent is a precision technical competition platform built with **Next.
 - **Dynamic Quiz Engine**:
   - True random question shuffling (Fisher-Yates).
   - Real-time countdown timer with auto-submission.
-  - **Question Navigator**: Interactive sidebar to track attempted vs. unattempted items.
+  - **Question Navigator**: Sidebar to track attempted vs. unattempted items.
   - Persistent state: Progress is saved locally in case of accidental refresh.
 
 ### 🛡️ Admin Portal
@@ -19,7 +19,7 @@ TechQuiz Ascent is a precision technical competition platform built with **Next.
 - **Question Bank Management**:
   - Full CRUD operations for technical questions.
   - Difficulty level assignment.
-  - **CSV Export**: Download the entire question bank for offline review.
+  - **CSV Export**: Download the entire question bank.
 - **Participant Management**:
   - **Promotion Workflow**: Review scores and promote high-performers to higher levels.
   - **Advanced Filtering**: Search by name/college and filter by score using mathematical symbols (≥, ≤, =).
@@ -76,13 +76,13 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
 ### 3. Admin Access
 1. Go to **Supabase Authentication** -> **Users**.
 2. Add a new user (e.g., `admin@example.com`).
-3. Log in via the `/admin` route on the web application.
+3. Log in via the `/admin` route.
 
 ## 📁 Project Structure
-- `src/app/` - Next.js App Router pages (Home, Quiz, Admin).
+- `src/app/` - Next.js App Router pages.
 - `src/components/` - Reusable ShadCN and custom UI components.
-- `src/lib/` - Utility functions and Supabase client initialization.
+- `src/lib/` - Utility functions and Supabase client.
 - `src/hooks/` - Custom React hooks for state and UI.
 
 ## 📜 License
-© 2024 TechQuiz Ascent. All rights reserved.
+© 2026 TechQuiz Ascent. All rights reserved.

@@ -320,7 +320,6 @@ export default function QuizPage() {
 
       <main className="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full">
         <div className="flex flex-col md:flex-row gap-8">
-          {/* Main Question Area */}
           <div className="flex-1 space-y-6">
             <div className="space-y-2">
               <div className="flex justify-between text-sm font-semibold text-muted-foreground">
@@ -390,7 +389,6 @@ export default function QuizPage() {
             </Card>
           </div>
 
-          {/* Right Sidebar - Question Navigator */}
           <aside className="w-full md:w-80">
             <div className="sticky top-28 space-y-6">
               <Card className="border-0 shadow-lg overflow-hidden">

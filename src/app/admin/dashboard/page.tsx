@@ -65,7 +65,6 @@ export default function AdminDashboard() {
         const { data: { session: activeSession }, error } = await supabase.auth.getSession();
         
         if (error || !activeSession) {
-          // If there's an auth error (like invalid refresh token), clear local session
           await supabase.auth.signOut();
           router.push("/admin");
           return;
@@ -80,7 +79,6 @@ export default function AdminDashboard() {
     };
     checkAuth();
 
-    // Listen for auth changes to handle token expiration gracefully
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT' || !session) {
         router.push("/admin");
