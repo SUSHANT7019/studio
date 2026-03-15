@@ -37,7 +37,8 @@ import {
   Trophy,
   FileDown,
   Upload,
-  Info
+  Info,
+  UserPlus
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
@@ -52,11 +53,12 @@ export default function AdminDashboard() {
   const [session, setSession] = useState<any>(null);
   const [dbError, setDbError] = useState<string | null>(null);
 
-  // Question selection for bulk actions
+  // Selection states
   const [selectedQuestions, setSelectedQuestions] = useState<string[]>([]);
-  const [qFilterLevel, setQFilterLevel] = useState("All");
+  const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
 
-  // Participant Filter & Sort states
+  // Filter & Sort states
+  const [qFilterLevel, setQFilterLevel] = useState("All");
   const [filterLevel, setFilterLevel] = useState("All");
   const [searchName, setSearchName] = useState("");
   const [scoreFilterValue, setScoreFilterValue] = useState<string>("");
@@ -113,7 +115,8 @@ export default function AdminDashboard() {
       
       setQuestions(qsRes.data || []);
       setResults(rsRes.data || []);
-      setSelectedQuestions([]); // Reset selection on fetch
+      setSelectedQuestions([]);
+      setSelectedParticipants([]);
     } catch (error: any) {
       console.error("Fetch error:", error);
       setDbError(error.message);
@@ -273,12 +276,10 @@ export default function AdminDashboard() {
     document.body.removeChild(link);
   };
 
-  // Filtered Questions
   const filteredQuestions = useMemo(() => {
     return questions.filter(q => qFilterLevel === "All" || q.difficulty_level === qFilterLevel);
   }, [questions, qFilterLevel]);
 
-  // Select all logic
   const handleSelectAllQuestions = (checked: boolean) => {
     if (checked) {
       setSelectedQuestions(filteredQuestions.map(q => q.id));
@@ -302,6 +303,44 @@ export default function AdminDashboard() {
     } else {
       fetchData();
       toast({ title: "Deleted", description: "Participant record removed." });
+    }
+  };
+
+  const handleBulkDeleteParticipants = async () => {
+    if (selectedParticipants.length === 0) return;
+    if (!confirm(`Are you sure you want to delete ${selectedParticipants.length} selected records?`)) return;
+
+    try {
+      const { error } = await supabase
+        .from("participants")
+        .delete()
+        .in("id", selectedParticipants);
+
+      if (error) throw error;
+
+      toast({ title: "Success", description: `Deleted ${selectedParticipants.length} participants.` });
+      fetchData();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleBulkPromoteParticipants = async (targetLevel: string) => {
+    if (selectedParticipants.length === 0) return;
+    if (!confirm(`Promote ${selectedParticipants.length} selected participants to ${targetLevel}?`)) return;
+
+    try {
+      const { error } = await supabase
+        .from("participants")
+        .update({ qualified_for: targetLevel })
+        .in("id", selectedParticipants);
+
+      if (error) throw error;
+
+      toast({ title: "Success", description: `Batch promoted ${selectedParticipants.length} participants to ${targetLevel}.` });
+      fetchData();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
     }
   };
 
@@ -378,6 +417,20 @@ export default function AdminDashboard() {
       return 0;
     });
   }, [results, filterLevel, searchName, scoreFilterValue, scoreFilterOperator, sortConfig]);
+
+  const handleSelectAllParticipants = (checked: boolean) => {
+    if (checked) {
+      setSelectedParticipants(filteredResults.map(r => r.id));
+    } else {
+      setSelectedParticipants([]);
+    }
+  };
+
+  const handleToggleParticipantSelection = (id: string) => {
+    setSelectedParticipants(prev => 
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  };
 
   const exportResultsToCSV = () => {
     const headers = ["Participant", "College", "Attempted Level", "Score", "Time (Seconds)", "Qualified For", "Date"];
@@ -607,7 +660,6 @@ export default function AdminDashboard() {
                 </div>
               </CardHeader>
 
-              {/* CSV Upload Help Banner */}
               <div className="bg-primary/5 px-6 py-3 border-b flex items-center justify-between">
                 <div className="flex items-center gap-2 text-xs text-primary font-medium">
                   <Info className="w-4 h-4" />
@@ -626,7 +678,6 @@ export default function AdminDashboard() {
                         <Checkbox 
                           checked={filteredQuestions.length > 0 && selectedQuestions.length === filteredQuestions.length}
                           onCheckedChange={handleSelectAllQuestions}
-                          aria-label="Select all questions"
                         />
                       </TableHead>
                       <TableHead className="py-4 font-bold">Question Detail</TableHead>
@@ -655,7 +706,6 @@ export default function AdminDashboard() {
                             <Checkbox 
                               checked={selectedQuestions.includes(q.id)}
                               onCheckedChange={() => handleToggleQuestionSelection(q.id)}
-                              aria-label={`Select question ${q.id}`}
                             />
                           </TableCell>
                           <TableCell className="font-medium max-w-2xl py-4">{q.question_text}</TableCell>
@@ -686,9 +736,38 @@ export default function AdminDashboard() {
                       <CardTitle className="text-2xl font-black">Participants Management</CardTitle>
                       <CardDescription>Review performance, correct data, and promote participants.</CardDescription>
                     </div>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedParticipants.length > 0 && (
+                        <div className="flex gap-2">
+                          <Button 
+                            onClick={() => handleBulkPromoteParticipants('Intermediate')} 
+                            variant="outline" 
+                            size="sm" 
+                            className="gap-2 h-10 px-4 font-bold border-primary/20 text-primary bg-primary/5"
+                          >
+                            <UserPlus className="w-4 h-4" /> Promote to Inter. ({selectedParticipants.length})
+                          </Button>
+                          <Button 
+                            onClick={() => handleBulkPromoteParticipants('Hard')} 
+                            variant="outline" 
+                            size="sm" 
+                            className="gap-2 h-10 px-4 font-bold border-accent/20 text-accent bg-accent/5"
+                          >
+                            <Trophy className="w-4 h-4" /> Promote to Hard ({selectedParticipants.length})
+                          </Button>
+                          <Button 
+                            onClick={handleBulkDeleteParticipants} 
+                            variant="destructive" 
+                            size="sm" 
+                            className="gap-2 h-10 px-4 font-bold"
+                          >
+                            <Trash2 className="w-4 h-4" /> Delete ({selectedParticipants.length})
+                          </Button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                   
-                  {/* Filters Bar */}
                   <div className="flex flex-wrap items-center gap-3 bg-secondary/20 p-4 rounded-xl border border-secondary">
                     <div className="flex items-center gap-2 mr-2 text-muted-foreground">
                       <Filter className="w-4 h-4" />
@@ -740,6 +819,12 @@ export default function AdminDashboard() {
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-secondary/50 hover:bg-secondary/50">
+                      <TableHead className="w-12 text-center">
+                        <Checkbox 
+                          checked={filteredResults.length > 0 && selectedParticipants.length === filteredResults.length}
+                          onCheckedChange={handleSelectAllParticipants}
+                        />
+                      </TableHead>
                       <TableHead className="font-bold py-4">Participant Detail</TableHead>
                       <TableHead className="font-bold py-4">Attempt</TableHead>
                       <TableHead 
@@ -755,7 +840,7 @@ export default function AdminDashboard() {
                         onClick={() => toggleSort('time_taken')}
                       >
                         <div className="flex items-center justify-center">
-                          Time Taken {renderSortIcon('time_taken')}
+                          Time {renderSortIcon('time_taken')}
                         </div>
                       </TableHead>
                       <TableHead className="font-bold py-4">Status / Promotion</TableHead>
@@ -766,6 +851,7 @@ export default function AdminDashboard() {
                     {loading ? (
                       Array.from({ length: 5 }).map((_, i) => (
                         <TableRow key={i}>
+                          <TableCell className="text-center"><Skeleton className="h-4 w-4 mx-auto" /></TableCell>
                           <TableCell><Skeleton className="h-10 w-32" /></TableCell>
                           <TableCell><Skeleton className="h-6 w-16" /></TableCell>
                           <TableCell><Skeleton className="h-8 w-8 mx-auto rounded-full" /></TableCell>
@@ -776,11 +862,17 @@ export default function AdminDashboard() {
                       ))
                     ) : filteredResults.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">No records found.</TableCell>
+                        <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">No records found.</TableCell>
                       </TableRow>
                     ) : (
                       filteredResults.map((r) => (
                         <TableRow key={r.id} className="hover:bg-primary/5 transition-colors group">
+                          <TableCell className="text-center">
+                            <Checkbox 
+                              checked={selectedParticipants.includes(r.id)}
+                              onCheckedChange={() => handleToggleParticipantSelection(r.id)}
+                            />
+                          </TableCell>
                           <TableCell className="py-4">
                             <div className="flex flex-col">
                               <span className="font-black text-foreground">{r.participant_name}</span>
@@ -849,7 +941,6 @@ export default function AdminDashboard() {
           </TabsContent>
         </Tabs>
 
-        {/* Participant Edit Dialog */}
         <Dialog open={isEditingParticipant !== null} onOpenChange={(open) => !open && setIsEditingParticipant(null)}>
           <DialogContent className="max-w-md">
             <form onSubmit={handleSaveParticipant} className="space-y-4">
