@@ -327,17 +327,45 @@ export default function AdminDashboard() {
 
   const handleBulkPromoteParticipants = async (targetLevel: string) => {
     if (selectedParticipants.length === 0) return;
-    if (!confirm(`Promote ${selectedParticipants.length} selected participants to ${targetLevel}?`)) return;
+
+    // Filter eligible participants based on strict level progression
+    // Basic attempters can only go to Intermediate
+    // Intermediate attempters can only go to Hard
+    const eligibleParticipants = results.filter(r => 
+      selectedParticipants.includes(r.id) && (
+        (targetLevel === 'Intermediate' && r.level === 'Basic') ||
+        (targetLevel === 'Hard' && r.level === 'Intermediate')
+      )
+    );
+
+    if (eligibleParticipants.length === 0) {
+      toast({ 
+        title: "Promotion Blocked", 
+        description: `None of the selected participants are eligible for direct promotion to ${targetLevel}. Progression must be step-by-step.`, 
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    const eligibleIds = eligibleParticipants.map(p => p.id);
+    const skippedCount = selectedParticipants.length - eligibleIds.length;
+
+    const message = `Promote ${eligibleIds.length} eligible participants to ${targetLevel}?${skippedCount > 0 ? ` Note: ${skippedCount} participants will be skipped because they are attempting a level skip which is not allowed.` : ''}`;
+    
+    if (!confirm(message)) return;
 
     try {
       const { error } = await supabase
         .from("participants")
         .update({ qualified_for: targetLevel })
-        .in("id", selectedParticipants);
+        .in("id", eligibleIds);
 
       if (error) throw error;
 
-      toast({ title: "Success", description: `Batch promoted ${selectedParticipants.length} participants to ${targetLevel}.` });
+      toast({ 
+        title: "Batch Promoted", 
+        description: `Successfully qualified ${eligibleIds.length} participants for ${targetLevel}.${skippedCount > 0 ? ` Skipped ${skippedCount} ineligible records.` : ''}` 
+      });
       fetchData();
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
